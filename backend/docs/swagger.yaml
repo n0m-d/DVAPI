@@ -1,0 +1,2041 @@
+basePath: /api/v2
+definitions:
+  github_com_n0m-d_DVAPI_internal_domain.AdminCreateUserRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      role:
+        enum:
+        - student
+        - instructor
+        - admin
+        type: string
+    required:
+    - email
+    - full_name
+    - password
+    - role
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.AdminUpdateUserRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      role:
+        enum:
+        - student
+        - instructor
+        - admin
+        type: string
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.CreateAnnouncementRequest:
+    properties:
+      content:
+        type: string
+      status:
+        enum:
+        - draft
+        - published
+        type: string
+      title:
+        type: string
+    required:
+    - content
+    - status
+    - title
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.CreateAssignmentInput:
+    properties:
+      course_id:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+    required:
+    - course_id
+    - description
+    - due_date
+    - status
+    - title
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.CreateCourseRequest:
+    properties:
+      description:
+        type: string
+      published:
+        type: boolean
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.CreateLessonRequest:
+    properties:
+      content:
+        type: string
+      sort_order:
+        type: integer
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.GradeSubmissionRequest:
+    properties:
+      feedback:
+        type: string
+      grade:
+        type: integer
+    required:
+    - grade
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.LessonProgressRequest:
+    properties:
+      completed:
+        type: boolean
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.UpdateAnnouncementRequest:
+    properties:
+      content:
+        type: string
+      status:
+        enum:
+        - draft
+        - published
+        type: string
+      title:
+        type: string
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.UpdateAssignmentRequest:
+    properties:
+      description:
+        type: string
+      due_date:
+        type: string
+      status:
+        enum:
+        - draft
+        - published
+        - closed
+        type: string
+      title:
+        type: string
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.UpdateCourseRequest:
+    properties:
+      description:
+        type: string
+      published:
+        type: boolean
+      title:
+        type: string
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.UpdateLessonRequest:
+    properties:
+      content:
+        type: string
+      sort_order:
+        type: integer
+      title:
+        type: string
+    type: object
+  github_com_n0m-d_DVAPI_internal_domain.UpdateUserRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+    type: object
+  internal_handler.emailRequest:
+    properties:
+      email:
+        description: ',email binding removed for SMTP CRLF Injection'
+        example: user@example.com
+        type: string
+    required:
+    - email
+    type: object
+  internal_handler.loginRequest:
+    properties:
+      email:
+        example: test@example.com
+        type: string
+      password:
+        example: password
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handler.passwordChangeRequest:
+    properties:
+      confirm_password:
+        example: newpassword123
+        type: string
+      current_password:
+        example: oldpassword
+        type: string
+      password:
+        example: newpassword123
+        minLength: 8
+        type: string
+    required:
+    - confirm_password
+    - current_password
+    - password
+    type: object
+  internal_handler.registerRequest:
+    properties:
+      confirm_password:
+        example: password123
+        type: string
+      email:
+        example: newuser@example.com
+        type: string
+      full_name:
+        example: Jane Doe
+        type: string
+      password:
+        example: password123
+        minLength: 8
+        type: string
+    required:
+    - confirm_password
+    - email
+    - full_name
+    - password
+    type: object
+  internal_handler.resetPasswordRequest:
+    properties:
+      confirm_password:
+        example: newpassword123
+        type: string
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: newpassword123
+        minLength: 8
+        type: string
+    required:
+    - confirm_password
+    - email
+    - password
+    type: object
+  internal_handler.verifyOTPRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      otp:
+        example: "123456"
+        type: string
+    required:
+    - email
+    - otp
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Damn Vulnerable API
+  title: DVAPI (Schole)
+  version: "1.0"
+paths:
+  /admin/logs:
+    get:
+      description: Returns the last lines of a log file under the server log directory.
+      parameters:
+      - default: 100
+        description: Number of lines
+        in: query
+        name: lines
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Log output
+        "400":
+          description: Missing file
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Failed to read logs
+      security:
+      - BearerAuth: []
+      summary: Tail application logs (admin only)
+      tags:
+      - Admin
+  /admin/stats:
+    get:
+      description: Get aggregate user and platform statistics (admin only).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Admin dashboard stats
+      tags:
+      - Admin
+  /admin/users:
+    get:
+      description: List users with optional search, role filter, and pagination.
+      parameters:
+      - description: Search by name or email
+        in: query
+        name: search
+        type: string
+      - description: Filter by role
+        in: query
+        name: role
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid pagination
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account (admin only).
+      parameters:
+      - description: New user payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.AdminCreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "409":
+          description: Email already registered
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create user
+      tags:
+      - Admin
+  /admin/users/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Update a user account (admin only).
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.AdminUpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid user id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: User not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update user
+      tags:
+      - Admin
+  /announcements/{id}:
+    delete:
+      description: Delete a course announcement.
+      parameters:
+      - description: Announcement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid announcement id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Announcement not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete announcement
+      tags:
+      - Announcements
+    patch:
+      consumes:
+      - application/json
+      description: Update an announcement in a course you own.
+      parameters:
+      - description: Announcement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Announcement fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.UpdateAnnouncementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid announcement id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Announcement not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update announcement
+      tags:
+      - Announcements
+  /assignment/create:
+    post:
+      consumes:
+      - application/json
+      description: Create an assignment for a course
+      parameters:
+      - description: Assignment payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.CreateAssignmentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create assignment
+      tags:
+      - Assignments
+  /assignments:
+    post:
+      consumes:
+      - application/json
+      description: Create an assignment for a course
+      parameters:
+      - description: Assignment payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.CreateAssignmentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create assignment
+      tags:
+      - Assignments
+  /assignments/{id}:
+    delete:
+      description: Delete an assignment.
+      parameters:
+      - description: Assignment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid assignment id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Assignment not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete assignment
+      tags:
+      - Assignments
+    get:
+      description: Get assignment details
+      parameters:
+      - description: Assignment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid assignment id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Assignment not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get assignment by ID
+      tags:
+      - Assignments
+    patch:
+      consumes:
+      - application/json
+      description: Update an assignment
+      parameters:
+      - description: Assignment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Assignment fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.UpdateAssignmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid assignment id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Assignment not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update assignment
+      tags:
+      - Assignments
+  /assignments/{id}/submissions:
+    get:
+      description: List submissions for an assignment with optional name filter and
+        pagination.
+      parameters:
+      - description: Assignment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Filter by student name
+        in: query
+        name: name
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid assignment id or pagination
+        "401":
+          description: Unauthorized
+        "404":
+          description: Assignment not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List assignment submissions
+      tags:
+      - Assignments
+    post:
+      consumes:
+      - multipart/form-data
+      description: Submit an assignment with text and an uploaded file.
+      parameters:
+      - description: Assignment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Submission text
+        in: formData
+        name: submission_text
+        required: true
+        type: string
+      - description: Uploaded file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Invalid assignment id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Assignment not found
+        "409":
+          description: Already submitted
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Submit assignment
+      tags:
+      - Assignments
+  /assignments/{id}/submissions/me:
+    get:
+      description: Get the authenticated student's submission for an assignment.
+      parameters:
+      - description: Assignment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid assignment id
+        "401":
+          description: Unauthorized
+        "404":
+          description: Submission not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get my submission
+      tags:
+      - Assignments
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with email and password and receive a JWT access token.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Validation error
+        "401":
+          description: Invalid email or password
+        "500":
+          description: Internal server error
+      summary: Login
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      description: Logout
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out successfully
+        "401":
+          description: Missing, invalid, or expired token
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Logout
+      tags:
+      - Auth
+  /auth/password-reset/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Set a new password after the OTP has been verified.
+      parameters:
+      - description: Email and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset successfully
+        "400":
+          description: Validation error or OTP not verified
+        "404":
+          description: User not found
+        "500":
+          description: Internal server error
+      summary: Confirm password reset
+      tags:
+      - Auth
+  /auth/password-reset/request:
+    post:
+      consumes:
+      - application/json
+      description: Send a one-time password (OTP) to the user's email for password
+        reset.
+      parameters:
+      - description: Account email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.emailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OTP issued
+        "400":
+          description: Validation error
+        "404":
+          description: User not found
+        "500":
+          description: Internal server error
+      summary: Request password reset
+      tags:
+      - Auth
+  /auth/password-reset/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify the OTP sent to the user's email before resetting the password.
+      parameters:
+      - description: Email and OTP
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.verifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OTP verified successfully
+        "400":
+          description: Validation error or invalid/expired OTP
+        "404":
+          description: User not found
+        "500":
+          description: Internal server error
+      summary: Verify password reset OTP
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with email, password, and full name.
+      parameters:
+      - description: Register request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User registered successfully
+        "400":
+          description: Validation error
+        "409":
+          description: Email already exists
+        "500":
+          description: Internal server error
+      summary: Register a new user
+      tags:
+      - Auth
+  /auth/update-password:
+    post:
+      consumes:
+      - application/json
+      description: Change the authenticated user's password.
+      parameters:
+      - description: Password change payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.passwordChangeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password updated successfully
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update password
+      tags:
+      - Auth
+  /courses:
+    get:
+      description: List published courses with optional title filter and pagination.
+      parameters:
+      - description: Include published courses (default true when omitted)
+        in: query
+        name: published
+        type: string
+      - description: Filter by title
+        in: query
+        name: title
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid pagination
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List courses
+      tags:
+      - Courses
+    post:
+      consumes:
+      - application/json
+      description: Create a new course as the authenticated instructor.
+      parameters:
+      - description: Course payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.CreateCourseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create course
+      tags:
+      - Courses
+  /courses/{courseId}:
+    delete:
+      description: Delete a course owned
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete course
+      tags:
+      - Courses
+    get:
+      description: Get course details by course ID.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "404":
+          description: Course not found
+      security:
+      - BearerAuth: []
+      summary: Get course by ID
+      tags:
+      - Courses
+    patch:
+      consumes:
+      - application/json
+      description: Update a course owned
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      - description: Course fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.UpdateCourseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update course
+      tags:
+      - Courses
+  /courses/{courseId}/analytics:
+    get:
+      description: Get enrollment, assignment, and progress analytics for a course
+        you own.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Course analytics
+      tags:
+      - Learning
+  /courses/{courseId}/announcements:
+    get:
+      description: List published announcements for a course the student is enrolled
+        in.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course announcements
+      tags:
+      - Announcements
+    post:
+      consumes:
+      - application/json
+      description: Create a course announcement.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      - description: Announcement payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.CreateAnnouncementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Invalid course id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create announcement
+      tags:
+      - Announcements
+  /courses/{courseId}/assignments:
+    get:
+      description: List published assignments for a course the student is enrolled
+        in.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course assignments
+      tags:
+      - Assignments
+  /courses/{courseId}/continue:
+    get:
+      description: Get the next lesson to continue for a course the student is enrolled
+        in.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Continue course
+      tags:
+      - Learning
+  /courses/{courseId}/enrollments/me:
+    delete:
+      description: Remove the authenticated student's enrollment from a course.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Unenroll from course
+      tags:
+      - Courses
+    post:
+      description: Enroll the authenticated student in a course.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "404":
+          description: Course not found
+        "409":
+          description: Already enrolled
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Enroll in course
+      tags:
+      - Courses
+  /courses/{courseId}/lessons:
+    get:
+      description: List lessons for a course the authenticated student is enrolled
+        in.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course lessons
+      tags:
+      - Lessons
+    post:
+      consumes:
+      - application/json
+      description: Create a lesson in a course
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      - description: Lesson payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.CreateLessonRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Invalid course id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create lesson
+      tags:
+      - Lessons
+  /courses/{courseId}/progress:
+    get:
+      description: Get lesson completion progress for a course the student is enrolled
+        in.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get course progress
+      tags:
+      - Learning
+  /courses/{courseId}/students:
+    get:
+      description: List students enrolled in a course
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      - description: Filter by student name
+        in: query
+        name: name
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id or pagination
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course students
+      tags:
+      - Courses
+  /enrolled-courses:
+    get:
+      description: List courses the authenticated student is enrolled in.
+      parameters:
+      - description: Filter by title
+        in: query
+        name: title
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid pagination
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List enrolled courses
+      tags:
+      - Courses
+  /enrolled-courses-count:
+    get:
+      description: Return the number of courses the authenticated student is enrolled
+        in.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Enrolled courses count
+      tags:
+      - Courses
+  /grades:
+    get:
+      description: List graded assignment submissions for the authenticated student.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get grades
+      tags:
+      - Learning
+  /lessons/{id}:
+    delete:
+      description: Delete a lesson from a course
+      parameters:
+      - description: Lesson ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid lesson id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Lesson not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete lesson
+      tags:
+      - Lessons
+    patch:
+      consumes:
+      - application/json
+      description: Update a lesson in a course
+      parameters:
+      - description: Lesson ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lesson fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.UpdateLessonRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid lesson id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Lesson not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update lesson
+      tags:
+      - Lessons
+  /lessons/{id}/progress:
+    put:
+      consumes:
+      - application/json
+      description: Mark a lesson as completed or incomplete for the authenticated
+        student.
+      parameters:
+      - description: Lesson ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Progress update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.LessonProgressRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid lesson id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not enrolled in this course
+        "404":
+          description: Lesson not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update lesson progress
+      tags:
+      - Learning
+  /my-courses:
+    get:
+      description: List courses owned
+      parameters:
+      - description: Filter by title
+        in: query
+        name: title
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid pagination
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List my courses
+      tags:
+      - Courses
+  /my-courses/{courseId}/announcements:
+    get:
+      description: List all announcements for a course you own.
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course announcements
+      tags:
+      - Announcements
+  /my-courses/{courseId}/assignments:
+    get:
+      description: List assignments for a course
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      - description: Filter by title
+        in: query
+        name: title
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id or pagination
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course assignments
+      tags:
+      - Assignments
+  /my-courses/{courseId}/lessons:
+    get:
+      description: List all lessons for a course
+      parameters:
+      - description: Course ID
+        in: path
+        name: courseId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid course id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Course not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List course lessons
+      tags:
+      - Lessons
+  /notifications:
+    get:
+      description: List notifications for the authenticated user with optional unread
+        filter.
+      parameters:
+      - description: Only unread notifications
+        in: query
+        name: unread
+        type: boolean
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid pagination
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List notifications
+      tags:
+      - Notifications
+  /notifications/{id}:
+    delete:
+      description: Delete a notification
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid notification id
+        "401":
+          description: Unauthorized
+        "404":
+          description: Notification not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete notification
+      tags:
+      - Notifications
+  /notifications/{id}/read:
+    post:
+      description: Mark a single notification as read
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid notification id
+        "401":
+          description: Unauthorized
+        "404":
+          description: Notification not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Mark notification read
+      tags:
+      - Notifications
+  /notifications/read-all:
+    post:
+      description: Mark all notifications as read
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Mark all notifications read
+      tags:
+      - Notifications
+  /stats:
+    get:
+      description: Aggregate stats for the authenticated user. Instructors get course/teaching
+        stats; students get enrollment/progress stats.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Dashboard stats
+      tags:
+      - Learning
+  /submissions/{id}:
+    get:
+      description: Get a submission for an assignment in a course you own.
+      parameters:
+      - description: Submission ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid submission id
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Submission not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get submission
+      tags:
+      - Assignments
+    put:
+      consumes:
+      - multipart/form-data
+      description: Submit a new version of an existing assignment submission with
+        text and file.
+      parameters:
+      - description: Submission ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Submission text
+        in: formData
+        name: submission_text
+        required: true
+        type: string
+      - description: Uploaded file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid submission id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Submission not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Resubmit assignment
+      tags:
+      - Assignments
+  /submissions/{id}/grade:
+    patch:
+      consumes:
+      - application/json
+      description: Grade a student submission for an assignment.
+      parameters:
+      - description: Submission ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Grade and feedback
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.GradeSubmissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid submission id or missing grade
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not your course
+        "404":
+          description: Submission not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Grade submission
+      tags:
+      - Assignments
+  /submissions/{id}/versions:
+    get:
+      description: List all versions of an assignment submission.
+      parameters:
+      - description: Submission ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid submission id
+        "401":
+          description: Unauthorized
+        "404":
+          description: Submission not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List submission versions
+      tags:
+      - Assignments
+  /users/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Update the profile for a user (own profile only).
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Profile fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_n0m-d_DVAPI_internal_domain.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid user id or validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: You can only update your own profile
+        "404":
+          description: User not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - Users
+  /users/me:
+    get:
+      description: Get the authenticated user's profile.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - Users
+securityDefinitions:
+  BearerAuth:
+    description: 'Type "Bearer" followed by a space and the JWT. Example: Bearer eyJhbGciOi...'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

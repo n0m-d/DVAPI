@@ -1,0 +1,150 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: gin-backend
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - backend-uploads:/app/uploads
+    working_dir: /app
+    command: air -c .air.toml
+    environment:
+      GIN_MODE: debug
+      GOFLAGS: -buildvcs=false
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/dvapi?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      HTTP_ADDR: ":8080"
+      APP_ENV: "production"
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      LOG_FILE: .log/access.log
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mailhog:
+        condition: service_started
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://127.0.0.1:8080/api/v2
+        VITE_LIBRARY_BASE_URL: http://127.0.0.1:5000/api
+    container_name: vue-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  library:
+    build:
+      context: ./library
+    container_name: py-library
+    network_mode: "service:backend"
+    volumes:
+      - ./library:/app
+    working_dir: /app
+    command: python app.py
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: dvapi-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dvapi
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dvapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - app-network
+
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app-network
+
+  promtail:
+    image: grafana/promtail:2.9.6
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+      # Bind-mounted straight from the host, same as `backend`'s own
+      # mount -- LOG_FILE=".log/access.log" relative to backend's
+      # working_dir /app resolves on the host to ./backend/.log/access.log
+      - ./backend/.log:/var/log/app:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+      - backend
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis-data:
+  backend-uploads:
+
+networks:
+  app-network:

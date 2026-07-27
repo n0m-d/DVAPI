@@ -1,0 +1,307 @@
+@keyframes auth-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(2%, -2%) scale(1.05);
+  }
+}
+
+@keyframes auth-pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes auth-grid-drift {
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(48px);
+  }
+}
+
+@keyframes auth-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.auth-page {
+  color: var(--foreground);
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 80%, color-mix(in oklch, var(--ring) 14%, transparent), transparent 50%),
+    var(--background);
+}
+
+.auth-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  animation: auth-float 12s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.auth-orb-1 {
+  top: 10%;
+  left: 5%;
+  width: 320px;
+  height: 320px;
+  background: color-mix(in oklch, var(--primary) 22%, transparent);
+}
+
+.auth-orb-2 {
+  right: 10%;
+  bottom: 15%;
+  width: 280px;
+  height: 280px;
+  background: color-mix(in oklch, var(--ring) 18%, transparent);
+  animation-delay: -4s;
+}
+
+.auth-orb-3 {
+  top: 50%;
+  left: 40%;
+  width: 200px;
+  height: 200px;
+  background: color-mix(in oklch, var(--chart-2, var(--primary)) 15%, transparent);
+  animation-delay: -8s;
+}
+
+.auth-grid {
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black 20%, transparent 90%);
+}
+
+.auth-grid-animated::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--primary) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--primary) 8%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: auth-grid-drift 20s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+  pointer-events: none;
+}
+
+.auth-scanline {
+  position: absolute;
+  inset-inline: 0;
+  height: 120px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklch, var(--primary) 6%, transparent),
+    transparent
+  );
+  animation: auth-scan 8s linear infinite;
+  pointer-events: none;
+}
+
+.auth-brand-glow {
+  text-shadow: 0 0 24px color-mix(in oklch, var(--primary) 50%, transparent);
+}
+
+.auth-title {
+  background: linear-gradient(
+    135deg,
+    var(--foreground) 0%,
+    color-mix(in oklch, var(--primary) 70%, var(--foreground)) 55%,
+    var(--primary) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+
+.auth-controls {
+  backdrop-filter: blur(12px);
+  background: color-mix(in oklch, var(--background) 50%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 0.25rem 0.5rem;
+}
+
+.auth-glass-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 70%, transparent);
+  backdrop-filter: blur(24px);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border) 50%, transparent) inset,
+    0 24px 48px -12px color-mix(in oklch, var(--foreground) 8%, transparent),
+    0 0 80px -20px color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+.auth-glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--foreground) 6%, transparent) 0%,
+    transparent 40%,
+    transparent 60%,
+    color-mix(in oklch, var(--primary) 5%, transparent) 100%
+  );
+  pointer-events: none;
+}
+
+.auth-glass-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--primary) 60%, transparent),
+    color-mix(in oklch, var(--ring) 60%, transparent),
+    transparent
+  );
+  animation: auth-pulse-glow 3s ease-in-out infinite;
+}
+
+.auth-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.auth-input {
+  height: 2.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--input);
+  background: var(--background);
+  color: var(--foreground);
+  transition: all 0.2s ease;
+}
+
+.auth-input::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+}
+
+.auth-input:focus-visible {
+  border-color: color-mix(in oklch, var(--ring) 60%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--ring) 30%, transparent),
+    0 0 20px -4px color-mix(in oklch, var(--ring) 40%, transparent);
+  outline: none;
+}
+
+.auth-button {
+  height: 2.75rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  box-shadow:
+    0 0 24px -4px color-mix(in oklch, var(--primary) 60%, transparent),
+    0 4px 12px -2px color-mix(in oklch, var(--foreground) 10%, transparent);
+  transition: all 0.2s ease;
+}
+
+.auth-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 0 32px -4px color-mix(in oklch, var(--primary) 80%, transparent),
+    0 8px 20px -4px color-mix(in oklch, var(--foreground) 12%, transparent);
+}
+
+.auth-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.auth-link {
+  color: var(--primary);
+  transition: all 0.15s ease;
+}
+
+.auth-link:hover {
+  filter: brightness(1.15);
+  text-shadow: 0 0 12px color-mix(in oklch, var(--primary) 50%, transparent);
+}
+
+.auth-muted {
+  color: var(--muted-foreground);
+}
+
+.auth-pin-input {
+  height: 3rem;
+  width: 3rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--input);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-monospace, monospace;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.auth-pin-input:focus-visible {
+  border-color: color-mix(in oklch, var(--ring) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--ring) 40%, transparent),
+    0 0 24px -4px color-mix(in oklch, var(--ring) 50%, transparent);
+  outline: none;
+}
+
+.auth-pin-input:not(:placeholder-shown) {
+  border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+  background: color-mix(in oklch, var(--primary) 10%, var(--background));
+}
+
+.auth-hero-stat {
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 60%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.auth-quote {
+  border-left: 2px solid color-mix(in oklch, var(--primary) 60%, transparent);
+  padding-left: 1rem;
+}
+
+.auth-accent {
+  color: var(--primary);
+}
+
+.auth-hero-text {
+  color: var(--foreground);
+}
+
+.auth-hero-muted {
+  color: var(--muted-foreground);
+}

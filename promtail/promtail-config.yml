@@ -1,0 +1,38 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: backend
+          app: gin-backend
+          # Exact filename, NOT a glob like *.log — lumberjack renames
+          # rotated files (access-<timestamp>.log, then .log.gz), so a
+          # wildcard would re-ingest old backups and trip over partial
+          # writes mid-rotation. Only the active file needs tailing.
+          __path__: /var/log/app/access.log
+    pipeline_stages:
+      # Only the lumberjack/JSONHandler output hits this file — the
+      # tint text handler writes to stderr for local dev and is never
+      # shipped here, so no need to handle its (non-JSON) format.
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            time: time
+      - labels:
+          level:
+      - timestamp:
+          source: time
+          # slog's JSONHandler emits RFC3339Nano, not plain RFC3339
+          format: RFC3339Nano

@@ -1,0 +1,387 @@
+@keyframes dash-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(1.5%, -1.5%) scale(1.04);
+  }
+}
+
+@keyframes dash-grid-drift {
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(40px);
+  }
+}
+
+@keyframes dash-pulse-line {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
+}
+
+[data-dashboard] {
+  position: relative;
+  isolation: isolate;
+  color: var(--foreground);
+  background:
+    radial-gradient(ellipse 70% 50% at 0% 0%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, color-mix(in oklch, var(--ring) 10%, transparent), transparent 50%),
+    var(--background);
+}
+
+[data-dashboard] .dash-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+[data-dashboard] .dash-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  animation: dash-float 14s ease-in-out infinite;
+}
+
+[data-dashboard] .dash-orb-1 {
+  top: -5%;
+  left: 20%;
+  width: 420px;
+  height: 420px;
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+
+[data-dashboard] .dash-orb-2 {
+  right: 5%;
+  bottom: 10%;
+  width: 360px;
+  height: 360px;
+  background: color-mix(in oklch, var(--ring) 12%, transparent);
+  animation-delay: -5s;
+}
+
+[data-dashboard] .dash-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--foreground) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--foreground) 3%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black, transparent);
+}
+
+[data-dashboard] .dash-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--primary) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--primary) 5%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: dash-grid-drift 24s linear infinite;
+}
+
+[data-dashboard] [data-slot="sidebar-inset"] {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+[data-dashboard] [data-sidebar="sidebar"] {
+  border-right: 1px solid var(--sidebar-border);
+  background: color-mix(in oklch, var(--sidebar) 82%, transparent);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    4px 0 24px -8px color-mix(in oklch, var(--foreground) 8%, transparent),
+    inset -1px 0 0 color-mix(in oklch, var(--sidebar-border) 50%, transparent);
+}
+
+[data-dashboard] [data-sidebar="menu-button"][data-active="true"] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: 1px solid color-mix(in oklch, var(--primary) 80%, white);
+  box-shadow: 0 0 16px -4px color-mix(in oklch, var(--primary) 55%, transparent);
+  font-weight: 600;
+}
+
+[data-dashboard] [data-sidebar="menu-button"][data-active="true"] svg {
+  color: var(--primary-foreground) !important;
+}
+
+[data-dashboard] [data-sidebar="menu-button"]:not([data-active="true"]) {
+  color: var(--muted-foreground);
+}
+
+[data-dashboard] [data-sidebar="menu-button"]:not([data-active="true"]):hover {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--accent) 60%, transparent);
+}
+
+[data-dashboard] [data-sidebar="group-label"] {
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+[data-dashboard] .dash-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  height: 3.5rem;
+  shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-inline: 1rem;
+  background: color-mix(in oklch, var(--background) 72%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+[data-dashboard] .dash-header-actions {
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 50%, transparent);
+}
+
+[data-dashboard] .dash-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: 1rem;
+}
+
+[data-dashboard] .dash-title {
+  background: linear-gradient(
+    135deg,
+    var(--foreground) 0%,
+    color-mix(in oklch, var(--primary) 70%, var(--foreground)) 55%,
+    var(--primary) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+
+[data-dashboard] .dash-subtitle {
+  color: var(--muted-foreground);
+}
+
+[data-dashboard] .dash-eyebrow {
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+[data-dashboard] [data-slot="card"] {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 65%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border) 40%, transparent) inset,
+    0 16px 40px -16px color-mix(in oklch, var(--foreground) 8%, transparent),
+    0 0 60px -24px color-mix(in oklch, var(--primary) 15%, transparent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-dashboard] [data-slot="card"]:hover {
+  border-color: color-mix(in oklch, var(--primary) 20%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border) 50%, transparent) inset,
+    0 20px 48px -16px color-mix(in oklch, var(--foreground) 10%, transparent),
+    0 0 80px -24px color-mix(in oklch, var(--primary) 25%, transparent);
+}
+
+[data-dashboard] [data-slot="card"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--primary) 35%, transparent),
+    color-mix(in oklch, var(--ring) 35%, transparent),
+    transparent
+  );
+  animation: dash-pulse-line 4s ease-in-out infinite;
+}
+
+[data-dashboard] .dash-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+[data-dashboard] .dash-stat-delta {
+  color: color-mix(in oklch, var(--chart-4, var(--primary)) 80%, var(--foreground));
+}
+
+[data-dashboard] [data-slot="tabs-list"] {
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted) 55%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+[data-dashboard] [data-slot="tabs-trigger"] {
+  color: var(--muted-foreground);
+}
+
+[data-dashboard] [data-slot="tabs-trigger"][data-state="active"] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border-color: color-mix(in oklch, var(--primary) 70%, transparent);
+  box-shadow: 0 1px 4px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+
+[data-dashboard] [data-slot="tabs-trigger"]:not([data-state="active"]):hover {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+
+[data-dashboard] [data-slot="input"] {
+  border-color: var(--input);
+  background: var(--background);
+  color: var(--foreground);
+  transition: all 0.2s ease;
+}
+
+[data-dashboard] [data-slot="input"]:focus-visible {
+  border-color: color-mix(in oklch, var(--ring) 50%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--ring) 25%, transparent),
+    0 0 16px -4px color-mix(in oklch, var(--ring) 35%, transparent);
+}
+
+[data-dashboard] [data-slot="input"]::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+}
+
+[data-dashboard] .dash-search [data-slot="input"] {
+  border-radius: 9999px;
+  padding-left: 1rem;
+}
+
+[data-dashboard] [data-slot="button"]:not(.dash-icon-btn) {
+  transition: all 0.2s ease;
+}
+
+/* Default / primary buttons — always use theme contrast pair */
+[data-dashboard] [data-slot="button"].bg-primary,
+[data-dashboard] [data-slot="button"][class*="bg-primary"]:not([class*="bg-primary/"]) {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border-color: transparent;
+}
+
+[data-dashboard] [data-slot="button"].bg-primary svg,
+[data-dashboard] [data-slot="button"][class*="bg-primary"]:not([class*="bg-primary/"]) svg {
+  color: var(--primary-foreground);
+}
+
+/* Outline / ghost buttons — readable text, not washed out */
+[data-dashboard] [data-slot="button"].border,
+[data-dashboard] [data-slot="button"][class*="border"]:not(.bg-primary) {
+  color: var(--foreground) !important;
+  border-color: var(--border);
+  background: color-mix(in oklch, var(--background) 80%, transparent);
+}
+
+[data-dashboard] [data-slot="button"].border:hover,
+[data-dashboard] [data-slot="button"][class*="border"]:not(.bg-primary):hover {
+  background: var(--accent);
+  color: var(--accent-foreground) !important;
+}
+
+/* Select & dropdown — highlighted / selected items */
+[data-slot="select-item"][data-highlighted],
+[data-slot="dropdown-menu-item"][data-highlighted],
+[data-slot="dropdown-menu-item"]:focus {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+[data-slot="select-trigger"] {
+  color: var(--foreground);
+}
+
+[data-dashboard] [data-slot="button"].bg-primary:hover,
+[data-dashboard] [data-slot="button"][class*="bg-primary"]:not([class*="bg-primary/"]):hover {
+  filter: brightness(1.08);
+  box-shadow: 0 0 28px -4px color-mix(in oklch, var(--primary) 70%, transparent);
+  transform: translateY(-1px);
+}
+
+[data-dashboard] [data-slot="separator"] {
+  background: var(--border);
+}
+
+/* Content links only — don't override nav tabs, buttons, or breadcrumbs */
+[data-dashboard] .dash-link {
+  color: var(--primary);
+  transition: color 0.15s ease;
+}
+
+[data-dashboard] .dash-link:hover {
+  filter: brightness(1.15);
+}
+
+/* Let nav tab utility classes control their own colors */
+[data-dashboard] nav.course-tabs a.course-tab.bg-primary {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+[data-dashboard] nav a[href] {
+  text-decoration: none;
+}
+
+[data-dashboard] nav a[href]:hover {
+  filter: none;
+}
+
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+  border: 1px solid var(--border) !important;
+  background: var(--popover) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border) 50%, transparent) inset,
+    0 24px 64px -16px color-mix(in oklch, var(--foreground) 12%, transparent),
+    0 0 80px -24px color-mix(in oklch, var(--primary) 30%, transparent) !important;
+  color: var(--popover-foreground) !important;
+}
+
+[data-slot="dropdown-menu-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"] {
+  border: 1px solid var(--border);
+  background: var(--popover);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 16px 40px -12px color-mix(in oklch, var(--foreground) 10%, transparent),
+    0 0 40px -16px color-mix(in oklch, var(--primary) 20%, transparent);
+  color: var(--popover-foreground);
+}

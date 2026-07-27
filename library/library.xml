@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<library>
+
+    <author id="1" name="George Orwell" country="UK">
+        <book id="1" title="1984" year="1949" genre="Dystopian">
+            <chapter id="1" number="1" name="The Party" />
+            <chapter id="2" number="2" name="Winston's Diary" />
+            <chapter id="3" number="3" name="Room 101" />
+        </book>
+        <book id="2" title="Animal Farm" year="1945" genre="Satire">
+            <chapter id="1" number="1" name="Old Major's Speech" />
+            <chapter id="2" number="2" name="The Rebellion" />
+        </book>
+    </author>
+
+    <author id="2" name="Aldous Huxley" country="UK">
+        <book id="3" title="Brave New World" year="1932" genre="Dystopian">
+            <chapter id="1" number="1" name="The Hatchery" />
+            <chapter id="2" number="2" name="Conditioning" />
+        </book>
+        <book id="4" title="Island" year="1962" genre="Philosophical Fiction">
+            <chapter id="1" number="1" name="Arrival at Pala" />
+            <chapter id="2" number="2" name="Island Customs" />
+            <chapter id="3" number="3" name="Final Reflections" />
+        </book>
+    </author>
+
+    <author id="3" name="Ray Bradbury" country="USA">
+        <book id="5" title="Fahrenheit 451" year="1953" genre="Dystopian">
+            <chapter id="1" number="1" name="The Hearth and the Salamander" />
+            <chapter id="2" number="2" name="The Sieve and the Sand" />
+        </book>
+        <book id="6" title="The Martian Chronicles" year="1950" genre="Science Fiction">
+            <chapter id="1" number="1" name="Rocket Summer" />
+            <chapter id="2" number="2" name="The Settlers" />
+            <chapter id="3" number="3" name="Mars Awakens" />
+        </book>
+    </author>
+
+    <author id="4" name="J.R.R. Tolkien" country="UK">
+        <book id="7" title="The Hobbit" year="1937" genre="Fantasy">
+            <chapter id="1" number="1" name="An Unexpected Party" />
+            <chapter id="2" number="2" name="Roast Mutton" />
+        </book>
+        <book id="8" title="The Fellowship of the Ring" year="1954" genre="Fantasy">
+            <chapter id="1" number="1" name="A Long-Expected Party" />
+            <chapter id="2" number="2" name="The Ring Goes South" />
+            <chapter id="3" number="3" name="Bridge of Khazad-dum" />
+            <bookmark>FLAG{x94th_</bookmark>
+        </book>
+    </author>
+
+    <author id="5" name="Haruki Murakami" country="Japan">
+        <book id="9" title="Kafka on the Shore" year="2002" genre="Magical Realism">
+            <chapter id="1" number="1" name="The Boy Named Crow" />
+            <chapter id="2" number="2" name="Library Encounter" />
+            <chapter id="3" number="3" name="Forest Journey" />
+        </book>
+        <book id="10" title="Norwegian Wood" year="1987" genre="Romance">
+            <chapter id="1" number="1" name="The Airplane" />
+            <chapter id="2" number="2" name="Memories" />
+            <bookmark>1nj3ct10n_</bookmark>
+        </book>
+        <book id="11" title="1Q84" year="2009" genre="Science Fiction">
+            <chapter id="1" number="1" name="Aomame" />
+            <chapter id="2" number="2" name="Tengo" />
+            <chapter id="3" number="3" name="Little People" />
+            <chapter id="4" number="4" name="The Parallel Moon" />
+        </book>
+    </author>
+
+    <author id="6" name="Stephen King" country="USA">
+        <book id="12" title="The Shining" year="1977" genre="Horror">
+            <chapter id="1" number="1" name="The Interview" />
+            <chapter id="2" number="2" name="Overlook Hotel" />
+            <chapter id="3" number="3" name="Room 217" />
+        </book>
+        <book id="13" title="Misery" year="1987" genre="Thriller">
+            <chapter id="1" number="1" name="The Accident" />
+            <chapter id="2" number="2" name="Captive Writer" />
+        </book>
+        <book id="14" title="It" year="1986" genre="Horror">
+            <chapter id="1" number="1" name="The Storm Drain" />
+            <chapter id="2" number="2" name="The Losers Club" />
+            <chapter id="3" number="3" name="Return to Derry" />
+            <bookmark>b00l34n</bookmark>
+        </book>
+    </author>
+
+    <author id="7" name="Agatha Christie" country="UK">
+        <book id="15" title="Murder on the Orient Express" year="1934" genre="Mystery">
+            <chapter id="1" number="1" name="The Train" />
+            <chapter id="2" number="2" name="The Crime" />
+            <chapter id="3" number="3" name="The Investigation" />
+        </book>
+        <book id="16" title="Death on the Nile" year="1937" genre="Mystery">
+            <chapter id="1" number="1" name="Aboard the Karnak" />
+            <chapter id="2" number="2" name="Suspicion" />
+        </book>
+    </author>
+
+    <author id="8" name="Isaac Asimov" country="Russia/USA">
+        <book id="17" title="Foundation" year="1951" genre="Science Fiction">
+            <chapter id="1" number="1" name="Hari Seldon" />
+            <chapter id="2" number="2" name="The Encyclopedists" />
+            <chapter id="3" number="3" name="The Mayors" />
+        </book>
+        <book id="18" title="I, Robot" year="1950" genre="Science Fiction">
+            <chapter id="1" number="1" name="Robbie" />
+            <chapter id="2" number="2" name="Runaround" />
+            <chapter id="3" number="3" name="Reason" />
+            <chapter id="4" number="4" name="Evidence" />
+        </book>
+    </author>
+
+    <author id="9" name="Jane Austen" country="UK">
+        <book id="19" title="Pride and Prejudice" year="1813" genre="Classic">
+            <chapter id="1" number="1" name="Netherfield" />
+            <chapter id="2" number="2" name="The Ball" />
+            <chapter id="3" number="3" name="Proposal" />
+        </book>
+        <book id="20" title="Emma" year="1815" genre="Classic">
+            <chapter id="1" number="1" name="Highbury" />
+            <chapter id="2" number="2" name="Matchmaking" />
+        </book>
+    </author>
+
+    <author id="10" name="Dan Brown" country="USA">
+        <book id="21" title="The Da Vinci Code" year="2003" genre="Thriller">
+            <chapter id="1" number="1" name="The Louvre" />
+            <chapter id="2" number="2" name="Hidden Symbols" />
+            <chapter id="3" number="3" name="The Keystone" />
+        </book>
+        <book id="22" title="Angels &amp; Demons" year="2000" genre="Thriller">
+            <chapter id="1" number="1" name="CERN" />
+            <chapter id="2" number="2" name="Illuminati" />
+            <chapter id="3" number="3" name="The Vatican" />
+            <chapter id="4" number="4" name="Conclave" />
+        </book>
+        <book id="23" title="Inferno" year="2013" genre="Thriller">
+            <chapter id="1" number="1" name="Florence" />
+            <chapter id="2" number="2" name="The Mask" />
+            <bookmark>_r34d5}</bookmark>
+        </book>
+    </author>
+
+</library>
