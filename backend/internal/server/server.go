@@ -94,8 +94,12 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 		Mailer: mailer,
 		Log:    log,
 	}
+
+	//Service
+	userSvc := service.NewUserService(userRepo, userCache)
+
 	// Handlers
-	userHandler := handler.NewUserHandler(service.NewUserService(userRepo, userCache))
+	userHandler := handler.NewUserHandler(userSvc)
 	authHandler := handler.NewAuthHandler(service.NewAuthService(userRepo, cfg, tokenBlacklist))
 	courseHandler := handler.NewCourseHandler(service.NewCourseService(courseRepo))
 	assignmentSvc := service.NewAssignmentService(assignmentRepo, courseRepo, notificationRepo, notifier)
@@ -133,6 +137,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 		Notifications:  notificationHandler,
 		Notes:          service.NewNoteService(noteRepo),
 		RateLimiter:    rateLimiter,
+		UserService:    userSvc,
 	})
 
 	apiv3.Register(router.Group("/api/v3/beta/"), apiv3.Config{

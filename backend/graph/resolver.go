@@ -9,4 +9,5 @@ import "github.com/n0m-d/DVAPI/internal/service"
 
 type Resolver struct {
 	NoteService service.NoteService
+	UserService service.UserService
 }

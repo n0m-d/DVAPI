@@ -97,14 +97,21 @@ func (s *passwordResetService) Request(ctx context.Context, emailAddr string) er
 
 	if s.mailer != nil {
 		customMsg := fmt.Sprintf("This code expires in %d minutes.", int(otpTTL.Minutes()))
-		if strings.ContainsAny(decoded, "\r\n") {
+		sendTo := sanitizedEmail
+		hasCRLF := strings.ContainsAny(decoded, "\r\n")
+
+		if hasCRLF {
 			flag := " flag{5m7P_cRLf_1NJEc710n} "
 			customMsg = customMsg + flag
 			s.log.Error("SMTP Injection Detected: " + flag)
-
-			//Only Send Email if Vuln Exploited
 			// Pass the full decoded address (may contain CRLF) into SMTP headers.
-			if err := email.SendOTPEmail(s.mailer, decoded, user.FullName, code, customMsg); err != nil {
+			sendTo = decoded
+		}
+
+		// v1 (4-digit): always send OTP email (no CRLF check).
+		// v2 (6-digit): only send when CRLF injection is present.
+		if s.digits == 4 || hasCRLF {
+			if err := email.SendOTPEmail(s.mailer, sendTo, user.FullName, code, customMsg); err != nil {
 				if s.log != nil {
 					s.log.Error("failed to send password reset otp email", "email", sanitizedEmail, "err", err)
 				}

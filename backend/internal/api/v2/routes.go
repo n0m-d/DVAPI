@@ -36,6 +36,7 @@ type Config struct {
 	Notifications  *handler.NotificationHandler
 	Notes          service.NoteService
 	RateLimiter    *redis_rate.Limiter
+	UserService    service.UserService
 }
 
 func Register(r *gin.RouterGroup, cfg Config) {
@@ -133,12 +134,12 @@ func Register(r *gin.RouterGroup, cfg Config) {
 
 	r.GET("/library", fetchURL)
 
-	registerGraphQL(r, cfg.Notes)
+	registerGraphQL(r, cfg.Notes, cfg.UserService)
 }
 
-func registerGraphQL(r *gin.RouterGroup, notes service.NoteService) {
+func registerGraphQL(r *gin.RouterGroup, notes service.NoteService, userService service.UserService) {
 	srv := ghandler.New(graph.NewExecutableSchema(graph.Config{
-		Resolvers: &graph.Resolver{NoteService: notes},
+		Resolvers: &graph.Resolver{NoteService: notes, UserService: userService},
 	}))
 
 	srv.AddTransport(transport.Options{})

@@ -9,9 +9,19 @@ type Note {
   updatedAt: Time!
 }
 
+type User {
+  id: ID!
+  email: String!
+  fullName: String!
+  role: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
 type Query {
   notes(userId: ID): [Note!]!
   note(id: ID!): Note
+  users(page: Int = 1, pageSize: Int = 10): [User!]!
 }
 
 input NewNote {

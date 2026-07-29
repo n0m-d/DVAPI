@@ -98,6 +98,30 @@ func (r *queryResolver) Note(ctx context.Context, id string) (*model.Note, error
 	return toModelNote(note), nil
 }
 
+// Users lists all users.
+func (r *queryResolver) Users(ctx context.Context, page *int32, pageSize *int32) ([]*model.User, error) {
+	p, ps := 1, 10
+	if page != nil {
+		p = int(*page)
+	}
+	if pageSize != nil {
+		ps = int(*pageSize)
+	}
+
+	resp, err := r.UserService.AdminList(ctx, "", "", p, ps)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Data == nil {
+		return []*model.User{}, nil
+	}
+	out := make([]*model.User, 0, len(resp.Data.Users))
+	for _, u := range resp.Data.Users {
+		out = append(out, toModelUser(u))
+	}
+	return out, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
@@ -108,14 +132,3 @@ type (
 	mutationResolver struct{ *Resolver }
 	queryResolver    struct{ *Resolver }
 )
-
-func toModelNote(n domain.Note) *model.Note {
-	return &model.Note{
-		ID:        n.ID.String(),
-		UserID:    n.UserID.String(),
-		Title:     n.Title,
-		Body:      n.Body,
-		CreatedAt: n.CreatedAt,
-		UpdatedAt: n.UpdatedAt,
-	}
-}

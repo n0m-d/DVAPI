@@ -83,3 +83,29 @@ make db-shell         # open a database prompt
 ```
 
 Run `make help` for the full list.
+
+-----
+
+## Vulnerability Surface
+
+DVAPI intentionally includes vulnerabilities across multiple attack surfaces and protocols to simulate realistic API security challenges. 
+
+### Attack Surfaces
+
+- REST API
+- GraphQL
+- SMTP
+- Database Layer
+- Operating System (OS) Layer
+
+### Vulnerability Categories
+
+The project covers vulnerabilities from a variety of security domains, including:
+
+- OWASP API Security Top 10
+- Injection vulnerabilities (across multiple protocols and technologies)
+- Authentication and authorization flaws
+- Information disclosure
+- Input validation failures
+
+> **Note:** Specific vulnerabilities and exploitation paths are intentionally undocumented. Discovering and exploiting them is part of the learning experience.

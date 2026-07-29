@@ -31,3 +31,12 @@ type UpdateNote struct {
 	Title *string `json:"title,omitempty"`
 	Body  *string `json:"body,omitempty"`
 }
+
+type User struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	FullName  string    `json:"fullName"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
