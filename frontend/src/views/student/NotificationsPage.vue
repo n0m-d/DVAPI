@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Bell, Megaphone, ClipboardList, GraduationCap, Settings, Trash2 } from 'lucide-vue-next'
+import { Bell, BookOpen, Megaphone, ClipboardList, GraduationCap, Settings, Trash2 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
@@ -38,6 +38,7 @@ const typeIcons: Record<AppNotification['type'], Component> = {
   assignment: ClipboardList,
   announcement: Megaphone,
   system: Settings,
+  enrollment: BookOpen,
 }
 
 function formatDate(date: string) {

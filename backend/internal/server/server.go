@@ -97,11 +97,12 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 
 	//Service
 	userSvc := service.NewUserService(userRepo, userCache)
+	courseSvc := service.NewCourseService(courseRepo, notificationRepo, notifier)
 
 	// Handlers
 	userHandler := handler.NewUserHandler(userSvc)
 	authHandler := handler.NewAuthHandler(service.NewAuthService(userRepo, cfg, tokenBlacklist))
-	courseHandler := handler.NewCourseHandler(service.NewCourseService(courseRepo))
+	courseHandler := handler.NewCourseHandler(courseSvc)
 	assignmentSvc := service.NewAssignmentService(assignmentRepo, courseRepo, notificationRepo, notifier)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc)
 	learningHandler := handler.NewLearningHandler(service.NewLearningService(learningRepo, courseRepo, assignmentRepo, notificationRepo, notifier))
@@ -110,7 +111,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 	resetSvc := service.NewPasswordResetService(userRepo, otpRepo, mailer, 6, log)
 	resetV1 := handler.NewPasswordResetHandler(resetCfg.WithDigits(4))
 	resetV2 := handler.NewPasswordResetHandler(resetCfg.WithDigits(6))
-	v3Handler := handler.NewV3Handler(service.NewCourseService(courseRepo))
+	v3Handler := handler.NewV3Handler(courseSvc)
 
 	/* Basic Rate Limiter
 	   TODO: Improve rate limiting further.

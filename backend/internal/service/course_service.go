@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	"github.com/n0m-d/DVAPI/internal/domain"
+	"github.com/n0m-d/DVAPI/internal/pubsub"
 	"github.com/n0m-d/DVAPI/internal/repository"
 )
 
@@ -66,10 +67,14 @@ type CourseService interface {
 
 type courseService struct {
 	courseRepository repository.CourseRepository
+	notifications    repository.NotificationRepository
+	notifier         pubsub.Notifier
 }
 
-func NewCourseService(courseRepository repository.CourseRepository) CourseService {
-	return &courseService{courseRepository: courseRepository}
+func NewCourseService(courseRepository repository.CourseRepository, notifications repository.NotificationRepository,
+	notifier pubsub.Notifier) CourseService {
+	return &courseService{courseRepository: courseRepository, notifications: notifications,
+		notifier: notifier}
 }
 
 func (s *courseService) GetCourses(ctx context.Context, input CourseListInput) (domain.CourseResponse, error) {
@@ -347,16 +352,22 @@ func (s *courseService) Enroll(ctx context.Context, courseID, studentID uuid.UUI
 		}
 		return err
 	}
+	notifyEnrollmentChange(s.notifications, s.notifier, course, studentID, true)
 	return nil
 }
 
 func (s *courseService) Unenroll(ctx context.Context, courseID, studentID uuid.UUID) error {
-	if err := s.courseRepository.Unenroll(ctx, studentID, courseID); err != nil {
+	course, err := s.courseRepository.GetByID(ctx, courseID)
+	if err != nil {
+		return mapCourseError(err)
+	}
+	if err := s.courseRepository.Unenroll(ctx, studentID, course.ID); err != nil {
 		if errors.Is(err, repository.ErrEnrollmentMissing) {
 			return ErrNotEnrolled
 		}
 		return err
 	}
+	notifyEnrollmentChange(s.notifications, s.notifier, course, studentID, false)
 	return nil
 }
 

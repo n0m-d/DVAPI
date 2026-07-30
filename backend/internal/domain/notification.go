@@ -11,6 +11,7 @@ const (
 	NotificationTypeAssignment   = "assignment"
 	NotificationTypeAnnouncement = "announcement"
 	NotificationTypeSystem       = "system"
+	NotificationTypeEnrollment   = "enrollment"
 )
 
 // Notification is an inbox event persisted in Postgres and optionally pushed over SSE.

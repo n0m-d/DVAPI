@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,4 +93,51 @@ func courseIDPtr(id uuid.UUID) *uuid.UUID {
 		return nil
 	}
 	return &id
+}
+
+// notifyEnrollmentChange notifies the student and course instructor about enroll/unenroll.
+func notifyEnrollmentChange(
+	notifications repository.NotificationRepository,
+	notifier pubsub.Notifier,
+	course domain.Course,
+	studentID uuid.UUID,
+	enrolled bool,
+) {
+	action := "unenrolled from"
+	studentTitle := "Course unenrolled"
+	instructorTitle := "Student unenrolled"
+
+	if enrolled {
+		action = "enrolled in"
+		studentTitle = "Course enrolled"
+		instructorTitle = "New enrollment"
+	}
+
+	courseID := courseIDPtr(course.ID)
+
+	notificationsToSend := []struct {
+		userID uuid.UUID
+		title  string
+		body   string
+	}{
+		{
+			userID: studentID,
+			title:  studentTitle,
+			body:   fmt.Sprintf("You have %s %s.", action, course.Title),
+		},
+		{
+			userID: course.Instructor.ID,
+			title:  instructorTitle,
+			body:   fmt.Sprintf("A student has %s %s.", action, course.Title),
+		},
+	}
+
+	for _, n := range notificationsToSend {
+		publishNotification(notifications, notifier, n.userID, domain.Notification{
+			Type:     domain.NotificationTypeEnrollment,
+			Title:    n.title,
+			Body:     n.body,
+			CourseID: courseID,
+		})
+	}
 }

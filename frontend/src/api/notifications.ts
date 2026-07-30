@@ -5,7 +5,7 @@ interface StatusResponse {
   status: string
 }
 
-export type ApiNotificationType = 'grade' | 'assignment' | 'announcement' | 'system'
+export type ApiNotificationType = 'grade' | 'assignment' | 'announcement' | 'system' | 'enrollment'
 
 export interface ApiNotification {
   id: UUID

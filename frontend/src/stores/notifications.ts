@@ -47,7 +47,7 @@ function persist(items: AppNotification[]) {
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 100)))
 }
 
-const NOTIFICATION_TYPES: NotificationType[] = ['grade', 'assignment', 'announcement', 'system']
+const NOTIFICATION_TYPES: NotificationType[] = ['grade', 'assignment', 'announcement', 'system', 'enrollment']
 
 function mapApiNotification(raw: ApiNotification): AppNotification | null {
   if (!NOTIFICATION_TYPES.includes(raw.type)) {
