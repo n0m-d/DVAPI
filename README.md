@@ -1,5 +1,8 @@
 # DVAPI
 
+![DVAPI](assets/banner.png "DVAPI")
+
+
 **Damn Vulnerable API (DVAPI)** is an intentionally vulnerable API application designed for learning, practicing, and testing API security concepts.
 
 The project provides a realistic development environment where developers and security researchers can explore common API vulnerabilities in a safe and controlled setup.
