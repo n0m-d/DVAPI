@@ -4,24 +4,33 @@
 
 The project provides a realistic development environment where developers and security researchers can explore common API vulnerabilities in a safe and controlled setup.
 
+---
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Make](https://www.gnu.org/software/make/)
+
+---
 
 ## Quick start
 
-You need Docker and Make.
+1. Clone the repo and enter it:
+
+```bash
+git clone <repo-url> DVAPI
+cd DVAPI
+```
+
+2. Start the stack (build images, migrate the database, and load sample data):
 
 ```bash
 make up
 ```
 
-That starts everything, sets up the database, and loads sample data. When it’s ready:
+That starts everything, sets up the database, and loads sample data.
 
-| What        | Open / connect at         |
-| ----------- | ------------------------- |
-| App (UI)    | http://localhost:5173     |
-| API         | http://localhost:8080     |
-| Email inbox | http://localhost:8025     |
-
-Password-reset emails and similar go to the **email inbox** page above (nothing is sent to real addresses).
+3. Open the **App (UI)** and create an account with **Register**, or log in if you already have one.
 
 Stop everything with:
 
@@ -29,18 +38,28 @@ Stop everything with:
 make down
 ```
 
+To wipe database and cache volumes as well:
+
+```bash
+make clean
+```
+---
 ## What’s running
 
-| Piece        | Role                                      | Port on your machine |
-| ------------ | ----------------------------------------- | -------------------- |
-| Frontend     | Vue web app                               | 5173                 |
-| Backend      | Go API                                    | 8080                 |
-| Library      | Small Flask helper service                | 5000                 |
-| PostgreSQL   | Database                                  | 5433                 |
-| Redis        | Cache                                     | 6380                 |
-| MailHog      | Fake mail server + web inbox              | 1025 (mail), 8025 (UI) |
+| Component           | Purpose                                                   |                           Local Port |
+| ------------------- | --------------------------------------------------------- | -----------------------------------: |
+| **Frontend**        | Vue.js web application                                    |                             **5173** |
+| **Backend**         | Go-based REST API                                         |                             **8080** |
+| **Library Service** | Flask helper                                              |                             **5000** |
+| **PostgreSQL**      | Primary relational database                               |                             **5433** |
+| **Redis**           | In-memory cache and session store                         |                             **6380** |
+| **MailHog**         | Local SMTP server and email testing UI                    |                             **1025** |
+| **Loki**            | Centralized log aggregation                               |                             **3100** |
+| **Grafana**         | Monitoring and log visualization (anonymous admin access) |                             **3001** |
 
-## Common commands
+---
+
+## Make commands
 
 ```bash
 make up          # start everything (build if needed), migrate, seed
@@ -84,23 +103,21 @@ make db-shell         # open a database prompt
 
 Run `make help` for the full list.
 
------
+---
 
-## Vulnerability Surface
+## Vulnerability surface
 
-DVAPI intentionally includes vulnerabilities across multiple attack surfaces and protocols to simulate realistic API security challenges. 
+DVAPI intentionally includes vulnerabilities across multiple attack surfaces and protocols to simulate realistic API security challenges.
 
-### Attack Surfaces
+### Surfaces
 
 - REST API
 - GraphQL
 - SMTP
-- Database Layer
-- Operating System (OS) Layer
+- Database layer
+- Operating system (OS) layer
 
-### Vulnerability Categories
-
-The project covers vulnerabilities from a variety of security domains, including:
+### Categories
 
 - OWASP API Security Top 10
 - Injection vulnerabilities (across multiple protocols and technologies)
