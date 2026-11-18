@@ -22,10 +22,10 @@ func NewNoteService(notes repository.NoteRepository) *noteService {
 func (s *noteService) Create(ctx context.Context, input domain.CreateNoteInput) (domain.Note, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	if input.UserID == uuid.Nil {
-		return domain.Note{}, fmt.Errorf("%w: user id is required", ErrInvalidInput)
+		return domain.Note{}, fmt.Errorf("%w: user id is required", domain.ErrInvalidInput)
 	}
 	if input.Title == "" {
-		return domain.Note{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+		return domain.Note{}, fmt.Errorf("%w: title is required", domain.ErrInvalidInput)
 	}
 	note, err := s.notes.Create(ctx, input)
 	if err != nil {
@@ -36,12 +36,12 @@ func (s *noteService) Create(ctx context.Context, input domain.CreateNoteInput) 
 
 func (s *noteService) GetByID(ctx context.Context, id string) (domain.Note, error) {
 	if id == "" {
-		return domain.Note{}, fmt.Errorf("%w: note id is required", ErrInvalidInput)
+		return domain.Note{}, fmt.Errorf("%w: note id is required", domain.ErrInvalidInput)
 	}
 	note, err := s.notes.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoteNotFound) {
-			return domain.Note{}, ErrNotFound
+			return domain.Note{}, domain.ErrNotFound
 		}
 		return domain.Note{}, err
 	}
@@ -58,22 +58,22 @@ func (s *noteService) List(ctx context.Context, userID *uuid.UUID) ([]domain.Not
 
 func (s *noteService) Update(ctx context.Context, id uuid.UUID, input domain.UpdateNoteInput) (domain.Note, error) {
 	if id == uuid.Nil {
-		return domain.Note{}, fmt.Errorf("%w: note id is required", ErrInvalidInput)
+		return domain.Note{}, fmt.Errorf("%w: note id is required", domain.ErrInvalidInput)
 	}
 	if input.Title == nil && input.Body == nil {
-		return domain.Note{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.Note{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 	if input.Title != nil {
 		trimmed := strings.TrimSpace(*input.Title)
 		if trimmed == "" {
-			return domain.Note{}, fmt.Errorf("%w: title cannot be empty", ErrInvalidInput)
+			return domain.Note{}, fmt.Errorf("%w: title cannot be empty", domain.ErrInvalidInput)
 		}
 		input.Title = &trimmed
 	}
 	note, err := s.notes.Update(ctx, id, input)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoteNotFound) {
-			return domain.Note{}, ErrNotFound
+			return domain.Note{}, domain.ErrNotFound
 		}
 		return domain.Note{}, err
 	}
@@ -82,11 +82,11 @@ func (s *noteService) Update(ctx context.Context, id uuid.UUID, input domain.Upd
 
 func (s *noteService) Delete(ctx context.Context, id uuid.UUID) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("%w: note id is required", ErrInvalidInput)
+		return fmt.Errorf("%w: note id is required", domain.ErrInvalidInput)
 	}
 	if err := s.notes.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNoteNotFound) {
-			return ErrNotFound
+			return domain.ErrNotFound
 		}
 		return err
 	}

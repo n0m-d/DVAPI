@@ -103,6 +103,7 @@ def books():
         return data
 
     try:
+        # VULN(XPath-injection): title is interpolated into the XPath expression.
         matches = tree.xpath(f"//book[@title='{title}']") if title else tree.xpath("//book")
     except etree.XPathEvalError:
         return jsonify({"found": False, "books": []}), 404

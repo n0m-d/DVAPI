@@ -36,7 +36,7 @@ func NewSMTPSender(host, port, username, password, from string) *SMTPSender {
 func (s *SMTPSender) Send(to, subject, htmlBody string) error {
 	sanitizedTo, _ := utils.SanitizeEmail(to)
 
-	// VULNERABLE: unsanitized `to` (may contain CRLF) is concatenated into Subject.
+	// VULN(CRLF): unsanitized `to` (may contain CRLF) is concatenated into Subject.
 	vulnerableSubject := subject + " for " + to
 
 	msg := fmt.Sprintf(

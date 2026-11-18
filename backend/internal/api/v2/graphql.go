@@ -26,7 +26,7 @@ func registerGraphQL(r *gin.RouterGroup, notes graph.NoteService, userService gr
 
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
 
-	srv.Use(extension.Introspection{}) //Vuln: Introspection Enabled
+	srv.Use(extension.Introspection{}) // VULN(graphql-introspection): introspection enabled in production.
 	srv.Use(extension.AutomaticPersistedQuery{
 		Cache: lru.New[string](100),
 	})

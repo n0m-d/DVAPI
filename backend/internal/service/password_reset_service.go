@@ -44,23 +44,23 @@ func NewPasswordResetService(
 func (s *passwordResetService) Request(ctx context.Context, emailAddr string) error {
 	emailAddr = strings.TrimSpace(strings.ToLower(emailAddr))
 	if emailAddr == "" {
-		return fmt.Errorf("%w: email is required", ErrInvalidInput)
+		return fmt.Errorf("%w: email is required", domain.ErrInvalidInput)
 	}
 
 	decoded, err := url.QueryUnescape(emailAddr)
 	if err != nil {
-		return fmt.Errorf("%w: proper email required", ErrInvalidInput)
+		return fmt.Errorf("%w: proper email required", domain.ErrInvalidInput)
 	}
 
 	sanitizedEmail, err := utils.SanitizeEmail(decoded)
 	if err != nil {
-		return fmt.Errorf("%w: proper email required", ErrInvalidInput)
+		return fmt.Errorf("%w: proper email required", domain.ErrInvalidInput)
 	}
 
 	user, err := s.users.GetByEmail(ctx, sanitizedEmail)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrNotFound
+			return domain.ErrNotFound
 		}
 		return err
 	}
@@ -124,25 +124,25 @@ func (s *passwordResetService) Verify(ctx context.Context, emailAddr, code strin
 	code = strings.TrimSpace(code)
 
 	if emailAddr == "" || code == "" {
-		return fmt.Errorf("%w: email and otp are required", ErrInvalidInput)
+		return fmt.Errorf("%w: email and otp are required", domain.ErrInvalidInput)
 	}
 	if len(code) != s.digits {
-		return fmt.Errorf("%w: otp must be %d digits", ErrInvalidInput, s.digits)
+		return fmt.Errorf("%w: otp must be %d digits", domain.ErrInvalidInput, s.digits)
 	}
 
 	otp, err := s.otps.GetLatestActiveByEmail(ctx, emailAddr)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrOTPInvalid
+			return domain.ErrOTPInvalid
 		}
 		return err
 	}
 	if otp.Digits != s.digits {
-		return ErrOTPInvalid
+		return domain.ErrOTPInvalid
 	}
 
 	if err := utils.VerifyPassword(code, otp.CodeHash); err != nil {
-		return ErrOTPInvalid
+		return domain.ErrOTPInvalid
 	}
 	if otp.VerifiedAt != nil {
 		return nil
@@ -154,24 +154,24 @@ func (s *passwordResetService) Verify(ctx context.Context, emailAddr, code strin
 func (s *passwordResetService) Reset(ctx context.Context, emailAddr, password, confirmPassword string) error {
 	emailAddr = strings.TrimSpace(strings.ToLower(emailAddr))
 	if emailAddr == "" || password == "" || confirmPassword == "" {
-		return fmt.Errorf("%w: email, password, and confirm_password are required", ErrInvalidInput)
+		return fmt.Errorf("%w: email, password, and confirm_password are required", domain.ErrInvalidInput)
 	}
 	if password != confirmPassword {
-		return fmt.Errorf("%w: passwords do not match", ErrInvalidInput)
+		return fmt.Errorf("%w: passwords do not match", domain.ErrInvalidInput)
 	}
 	if len(password) < 8 {
-		return fmt.Errorf("%w: password must be at least 8 characters", ErrInvalidInput)
+		return fmt.Errorf("%w: password must be at least 8 characters", domain.ErrInvalidInput)
 	}
 
 	otp, err := s.otps.GetLatestVerifiedByEmail(ctx, emailAddr)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrOTPNotVerified
+			return domain.ErrOTPNotVerified
 		}
 		return err
 	}
 	if otp.Digits != s.digits {
-		return ErrOTPNotVerified
+		return domain.ErrOTPNotVerified
 	}
 
 	hash, err := utils.HashPassword(password)

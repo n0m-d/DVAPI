@@ -15,6 +15,7 @@ func founderNotes(ctx *gin.Context) {
 		return
 	}
 
+	// VULN(JWT): signature is never verified (ParseUnverified).
 	parser := jwt.NewParser()
 
 	token, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})

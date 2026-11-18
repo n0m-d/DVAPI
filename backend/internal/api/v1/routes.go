@@ -25,7 +25,7 @@ func Register(r *gin.RouterGroup, cfg Config) {
 
 	privOnly := protected.Group("/")
 	privOnly.Use(middleware.RoleRestrict("instructor", "admin"))
-	privOnly.PATCH("/users/:id", cfg.Users.UpdateProfilev1) // mass assignment route, priv escalation
+	privOnly.PATCH("/users/:id", cfg.Users.UpdateProfilev1) // VULN(mass-assignment): role field accepted, allowing privilege escalation.
 
 	r.GET("/admin/founder-notes", founderNotes)
 }

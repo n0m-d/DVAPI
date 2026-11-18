@@ -60,7 +60,7 @@ func TestUpdateProfile_RejectsUpdatingAnotherUser(t *testing.T) {
 	svc := service.NewUserService(&mockUserRepository{}, nil)
 	_, err := svc.UpdateProfile(context.Background(), uuid.New(), uuid.New(), domain.UpdateUserRequest{})
 
-	if !errors.Is(err, service.ErrForbidden) {
+	if !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("error = %v, want ErrForbidden", err)
 	}
 }
@@ -79,7 +79,7 @@ func TestGetByID_RejectsNilUUIDWithoutCallingRepository(t *testing.T) {
 	svc := service.NewUserService(repo, nil)
 	_, err := svc.GetByID(context.Background(), uuid.Nil)
 
-	if !errors.Is(err, service.ErrInvalidInput) {
+	if !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("error = %v, want ErrInvalidInput", err)
 	}
 	if called {
@@ -99,7 +99,7 @@ func TestGetByID_MapsNotFound(t *testing.T) {
 	svc := service.NewUserService(repo, nil)
 	_, err := svc.GetByID(context.Background(), uuid.New())
 
-	if !errors.Is(err, service.ErrNotFound) {
+	if !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("error = %v, want ErrNotFound", err)
 	}
 }

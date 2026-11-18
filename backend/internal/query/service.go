@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/service"
 )
 
 var errNotFound = errors.New("not found")
@@ -74,7 +73,7 @@ func (s *queryService) AdminList(ctx context.Context, search, role string, page,
 	search = strings.TrimSpace(search)
 	role = strings.TrimSpace(role)
 	if role != "" && role != "student" && role != "instructor" && role != "admin" {
-		return domain.AdminUserListResponse{}, fmt.Errorf("%w: invalid role", service.ErrInvalidInput)
+		return domain.AdminUserListResponse{}, fmt.Errorf("%w: invalid role", domain.ErrInvalidInput)
 	}
 
 	page, pageSize = normalizePagination(page, pageSize)
@@ -98,14 +97,14 @@ func (s *queryService) AdminList(ctx context.Context, search, role string, page,
 
 func (s *queryService) InstructorStats(ctx context.Context, instructorID uuid.UUID) (domain.InstructorStats, error) {
 	if instructorID == uuid.Nil {
-		return domain.InstructorStats{}, fmt.Errorf("%w: instructor id is required", service.ErrInvalidInput)
+		return domain.InstructorStats{}, fmt.Errorf("%w: instructor id is required", domain.ErrInvalidInput)
 	}
 	return s.store.InstructorStats(ctx, instructorID)
 }
 
 func (s *queryService) StudentStats(ctx context.Context, studentID uuid.UUID) (domain.StudentStats, error) {
 	if studentID == uuid.Nil {
-		return domain.StudentStats{}, fmt.Errorf("%w: student id is required", service.ErrInvalidInput)
+		return domain.StudentStats{}, fmt.Errorf("%w: student id is required", domain.ErrInvalidInput)
 	}
 	return s.store.StudentStats(ctx, studentID)
 }
@@ -212,7 +211,7 @@ func (s *queryService) requireEnrollment(ctx context.Context, studentID, courseI
 		return err
 	}
 	if !enrolled {
-		return service.ErrNotEnrolled
+		return domain.ErrNotEnrolled
 	}
 	return nil
 }
@@ -223,14 +222,14 @@ func (s *queryService) requireOwnedCourse(ctx context.Context, courseID, instruc
 		return domain.Course{}, mapQueryError(err)
 	}
 	if course.Instructor.ID != instructorID {
-		return domain.Course{}, service.ErrForbidden
+		return domain.Course{}, domain.ErrForbidden
 	}
 	return course, nil
 }
 
 func mapQueryError(err error) error {
 	if errors.Is(err, errNotFound) {
-		return service.ErrNotFound
+		return domain.ErrNotFound
 	}
 	return err
 }

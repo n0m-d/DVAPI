@@ -70,24 +70,24 @@ func (s *learningService) GetNextLesson(ctx context.Context, courseID, studentID
 func (s *learningService) Resubmit(ctx context.Context, input ResubmitInput) (domain.AssignmentSubmission, error) {
 	text := strings.TrimSpace(input.SubmissionText)
 	if text == "" || input.FilePath == "" {
-		return domain.AssignmentSubmission{}, fmt.Errorf("%w: submission_text and file are required", ErrInvalidInput)
+		return domain.AssignmentSubmission{}, fmt.Errorf("%w: submission_text and file are required", domain.ErrInvalidInput)
 	}
 	submission, err := s.assignments.GetSubmissionByID(ctx, input.SubmissionID)
 	if err != nil {
 		return domain.AssignmentSubmission{}, mapLearningError(err)
 	}
 	if submission.StudentID != input.StudentID {
-		return domain.AssignmentSubmission{}, ErrForbidden
+		return domain.AssignmentSubmission{}, domain.ErrForbidden
 	}
 	assignment, err := s.assignments.GetByID(ctx, submission.AssignmentID)
 	if err != nil {
 		return domain.AssignmentSubmission{}, mapLearningError(err)
 	}
 	if assignment.Status != domain.AssignmentStatusPublished {
-		return domain.AssignmentSubmission{}, ErrAssignmentClosed
+		return domain.AssignmentSubmission{}, domain.ErrAssignmentClosed
 	}
 	if time.Now().After(assignment.DueDate) {
-		return domain.AssignmentSubmission{}, ErrPastDue
+		return domain.AssignmentSubmission{}, domain.ErrPastDue
 	}
 	return s.learning.Resubmit(ctx, input.SubmissionID, text, input.FilePath, input.FileName)
 }
@@ -97,19 +97,21 @@ func (s *learningService) ListSubmissionVersions(ctx context.Context, submission
 	if err != nil {
 		return nil, mapLearningError(err)
 	}
-	// if submission.StudentID != studentID { //check commented out for vuln
-	// 	return nil, ErrForbidden
+	// VULN(BOLA): ownership check removed; any student can list another student's submission versions.
+	// if submission.StudentID != studentID {
+	// 	return nil, domain.ErrForbidden
 	// }
 	return s.learning.ListSubmissionVersions(ctx, submission.ID)
 }
 
 func (s *learningService) CreateAnnouncement(ctx context.Context, courseID, instructorID uuid.UUID, input domain.CreateAnnouncementRequest) (domain.Announcement, error) {
-	// if _, err := s.requireOwnedCourse(ctx, courseID, instructorID); err != nil { //Vuln Added: Ownership Check removed
+	// VULN(BFLA): ownership check removed; any user can post announcements to any course.
+	// if _, err := s.requireOwnedCourse(ctx, courseID, instructorID); err != nil {
 	// 	return domain.Announcement{}, err
 	// }
 	title, content := strings.TrimSpace(input.Title), strings.TrimSpace(input.Content)
 	if title == "" || content == "" || !validAnnouncementStatus(input.Status) {
-		return domain.Announcement{}, fmt.Errorf("%w: title, content, and valid status are required", ErrInvalidInput)
+		return domain.Announcement{}, fmt.Errorf("%w: title, content, and valid status are required", domain.ErrInvalidInput)
 	}
 	announcement, err := s.learning.CreateAnnouncement(ctx, courseID, instructorID, title, content, input.Status)
 	if err != nil {
@@ -136,7 +138,7 @@ func (s *learningService) ListAnnouncements(ctx context.Context, courseID, userI
 
 func (s *learningService) UpdateAnnouncement(ctx context.Context, id, instructorID uuid.UUID, input domain.UpdateAnnouncementRequest) (domain.Announcement, error) {
 	if input.Title == nil && input.Content == nil && input.Status == nil {
-		return domain.Announcement{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.Announcement{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 	announcement, err := s.learning.GetAnnouncement(ctx, id)
 	if err != nil {
@@ -154,12 +156,12 @@ func (s *learningService) UpdateAnnouncement(ctx context.Context, id, instructor
 	}
 	if input.Status != nil {
 		if !validAnnouncementStatus(*input.Status) {
-			return domain.Announcement{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+			return domain.Announcement{}, fmt.Errorf("%w: invalid status", domain.ErrInvalidInput)
 		}
 		announcement.Status = *input.Status
 	}
 	if announcement.Title == "" || announcement.Content == "" {
-		return domain.Announcement{}, fmt.Errorf("%w: title and content cannot be empty", ErrInvalidInput)
+		return domain.Announcement{}, fmt.Errorf("%w: title and content cannot be empty", domain.ErrInvalidInput)
 	}
 	updated, err := s.learning.UpdateAnnouncement(ctx, announcement)
 	if err != nil {
@@ -176,7 +178,8 @@ func (s *learningService) DeleteAnnouncement(ctx context.Context, id, instructor
 	if err != nil {
 		return mapLearningError(err)
 	}
-	// if _, err := s.requireOwnedCourse(ctx, announcement.CourseID, instructorID); err != nil { //Vuln: Removed Ownership Check
+	// VULN(BFLA): ownership check removed; any user can delete any course's announcements.
+	// if _, err := s.requireOwnedCourse(ctx, announcement.CourseID, instructorID); err != nil {
 	// 	return err
 	// }
 	return mapLearningError(s.learning.DeleteAnnouncement(ctx, announcement.ID))
@@ -202,7 +205,7 @@ func (s *learningService) requireEnrollment(ctx context.Context, studentID, cour
 	}
 
 	// if !course.Published { // Published Status Check removal
-	// 	return ErrNotFound
+	// 	return domain.ErrNotFound
 	// }
 
 	enrolled, err := s.courses.IsEnrolled(ctx, studentID, course.ID)
@@ -210,7 +213,7 @@ func (s *learningService) requireEnrollment(ctx context.Context, studentID, cour
 		return err
 	}
 	if !enrolled {
-		return ErrNotEnrolled
+		return domain.ErrNotEnrolled
 	}
 	return nil
 }
@@ -221,7 +224,7 @@ func (s *learningService) requireOwnedCourse(ctx context.Context, courseID, inst
 		return domain.Course{}, mapLearningError(err)
 	}
 	if course.Instructor.ID != instructorID {
-		return domain.Course{}, ErrForbidden
+		return domain.Course{}, domain.ErrForbidden
 	}
 	return course, nil
 }
@@ -239,7 +242,7 @@ func mapLearningError(err error) error {
 		errors.Is(err, repository.ErrSubmissionNotFound),
 		errors.Is(err, repository.ErrAssignmentNotFound),
 		errors.Is(err, repository.ErrAnnouncementNotFound):
-		return ErrNotFound
+		return domain.ErrNotFound
 	default:
 		return err
 	}

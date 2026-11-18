@@ -15,13 +15,6 @@ import (
 	"github.com/n0m-d/DVAPI/internal/repository"
 )
 
-var (
-	ErrNotEnrolled      = errors.New("not enrolled in course")
-	ErrAssignmentClosed = errors.New("assignment is not open for submissions")
-	ErrPastDue          = errors.New("assignment due date has passed")
-	ErrForbidden        = errors.New("forbidden")
-)
-
 type ListCourseAssignmentsInput struct {
 	CourseID     uuid.UUID
 	InstructorID uuid.UUID
@@ -63,24 +56,24 @@ func NewAssignmentService(
 
 func (s *assignmentService) CreateAssignment(ctx context.Context, input domain.CreateAssignmentInput, userId uuid.UUID) (domain.Assignment, error) {
 	if input.CourseID == uuid.Nil || strings.TrimSpace(input.Title) == "" {
-		return domain.Assignment{}, fmt.Errorf("%w: course_id and title are required", ErrInvalidInput)
+		return domain.Assignment{}, fmt.Errorf("%w: course_id and title are required", domain.ErrInvalidInput)
 	}
 	if input.Status != domain.AssignmentStatusDraft && input.Status != domain.AssignmentStatusPublished && input.Status != domain.AssignmentStatusClosed {
-		return domain.Assignment{}, fmt.Errorf("%w: invalid status value", ErrInvalidInput)
+		return domain.Assignment{}, fmt.Errorf("%w: invalid status value", domain.ErrInvalidInput)
 	}
 	if input.DueDate.IsZero() {
-		return domain.Assignment{}, fmt.Errorf("%w: due_date is required", ErrInvalidInput)
+		return domain.Assignment{}, fmt.Errorf("%w: due_date is required", domain.ErrInvalidInput)
 	}
 
 	course, err := s.courses.GetByID(ctx, input.CourseID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.Assignment{}, ErrNotFound
+			return domain.Assignment{}, domain.ErrNotFound
 		}
 		return domain.Assignment{}, err
 	}
 	if course.Instructor.ID != userId {
-		return domain.Assignment{}, ErrForbidden
+		return domain.Assignment{}, domain.ErrForbidden
 	}
 
 	assignment, err := s.assignments.Create(ctx, repository.CreateAssignmentInput{
@@ -93,7 +86,7 @@ func (s *assignmentService) CreateAssignment(ctx context.Context, input domain.C
 	})
 	if err != nil {
 		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.Assignment{}, ErrNotFound
+			return domain.Assignment{}, domain.ErrNotFound
 		}
 		return domain.Assignment{}, err
 	}
@@ -105,7 +98,7 @@ func (s *assignmentService) CreateAssignment(ctx context.Context, input domain.C
 
 func (s *assignmentService) UpdateAssignment(ctx context.Context, assignmentID, instructorID uuid.UUID, input domain.UpdateAssignmentRequest) (domain.Assignment, error) {
 	if input.Title == nil && input.Description == nil && input.DueDate == nil && input.Status == nil {
-		return domain.Assignment{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.Assignment{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 	assignment, err := s.ownedAssignment(ctx, assignmentID, instructorID)
 	if err != nil {
@@ -115,7 +108,7 @@ func (s *assignmentService) UpdateAssignment(ctx context.Context, assignmentID, 
 	if input.Title != nil {
 		assignment.Title = strings.TrimSpace(*input.Title)
 		if assignment.Title == "" {
-			return domain.Assignment{}, fmt.Errorf("%w: title cannot be empty", ErrInvalidInput)
+			return domain.Assignment{}, fmt.Errorf("%w: title cannot be empty", domain.ErrInvalidInput)
 		}
 	}
 	if input.Description != nil {
@@ -123,13 +116,13 @@ func (s *assignmentService) UpdateAssignment(ctx context.Context, assignmentID, 
 	}
 	if input.DueDate != nil {
 		if input.DueDate.IsZero() {
-			return domain.Assignment{}, fmt.Errorf("%w: due_date is invalid", ErrInvalidInput)
+			return domain.Assignment{}, fmt.Errorf("%w: due_date is invalid", domain.ErrInvalidInput)
 		}
 		assignment.DueDate = *input.DueDate
 	}
 	if input.Status != nil {
 		if !validAssignmentStatus(*input.Status) {
-			return domain.Assignment{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+			return domain.Assignment{}, fmt.Errorf("%w: invalid status", domain.ErrInvalidInput)
 		}
 		assignment.Status = *input.Status
 	}
@@ -153,7 +146,7 @@ func (s *assignmentService) DeleteAssignment(ctx context.Context, assignmentID, 
 	}
 	if err := s.assignments.Delete(ctx, assignmentID); err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return ErrNotFound
+			return domain.ErrNotFound
 		}
 		return err
 	}
@@ -162,7 +155,7 @@ func (s *assignmentService) DeleteAssignment(ctx context.Context, assignmentID, 
 
 func (s *assignmentService) ListPublishedByCourse(ctx context.Context, courseID, studentID uuid.UUID) ([]domain.Assignment, error) {
 	if courseID == uuid.Nil || studentID == uuid.Nil {
-		return nil, fmt.Errorf("%w: course_id and student are required", ErrInvalidInput)
+		return nil, fmt.Errorf("%w: course_id and student are required", domain.ErrInvalidInput)
 	}
 
 	enrolled, err := s.assignments.IsEnrolled(ctx, studentID, courseID)
@@ -170,7 +163,7 @@ func (s *assignmentService) ListPublishedByCourse(ctx context.Context, courseID,
 		return nil, err
 	}
 	if !enrolled {
-		return nil, ErrNotEnrolled
+		return nil, domain.ErrNotEnrolled
 	}
 
 	return s.assignments.ListPublishedByCourse(ctx, courseID)
@@ -180,12 +173,12 @@ func (s *assignmentService) ListCourseAssignments(ctx context.Context, input Lis
 	course, err := s.courses.GetByID(ctx, input.CourseID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.AssignmentListResponse{}, ErrNotFound
+			return domain.AssignmentListResponse{}, domain.ErrNotFound
 		}
 		return domain.AssignmentListResponse{}, err
 	}
 	if course.Instructor.ID != input.InstructorID {
-		return domain.AssignmentListResponse{}, ErrForbidden
+		return domain.AssignmentListResponse{}, domain.ErrForbidden
 	}
 
 	page, pageSize := normalizePagination(input.Page, input.PageSize)
@@ -221,7 +214,7 @@ func (s *assignmentService) ListSubmissions(ctx context.Context, input ListSubmi
 	assignment, err := s.assignments.GetByID(ctx, input.AssignmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return domain.SubmissionListResponse{}, ErrNotFound
+			return domain.SubmissionListResponse{}, domain.ErrNotFound
 		}
 		return domain.SubmissionListResponse{}, err
 	}
@@ -259,7 +252,7 @@ func (s *assignmentService) GetByID(ctx context.Context, assignmentID, studentID
 	assignment, err := s.assignments.GetByID(ctx, assignmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return domain.Assignment{}, ErrNotFound
+			return domain.Assignment{}, domain.ErrNotFound
 		}
 		return domain.Assignment{}, err
 	}
@@ -271,7 +264,7 @@ func (s *assignmentService) GetAccessibleByID(ctx context.Context, assignmentID,
 	assignment, err := s.assignments.GetByID(ctx, assignmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return domain.Assignment{}, ErrNotFound
+			return domain.Assignment{}, domain.ErrNotFound
 		}
 		return domain.Assignment{}, err
 	}
@@ -283,18 +276,18 @@ func (s *assignmentService) GetAccessibleByID(ctx context.Context, assignmentID,
 		course, err := s.courses.GetByID(ctx, assignment.CourseID)
 		if err != nil {
 			if errors.Is(err, repository.ErrCourseNotFound) {
-				return domain.Assignment{}, ErrNotFound
+				return domain.Assignment{}, domain.ErrNotFound
 			}
 			return domain.Assignment{}, err
 		}
 		if course.Instructor.ID != userID {
-			return domain.Assignment{}, ErrForbidden
+			return domain.Assignment{}, domain.ErrForbidden
 		}
 		return assignment, nil
 	case "student":
 		return s.requireStudentAssignment(ctx, assignment, userID)
 	default:
-		return domain.Assignment{}, ErrForbidden
+		return domain.Assignment{}, domain.ErrForbidden
 	}
 }
 
@@ -304,11 +297,11 @@ func (s *assignmentService) requireStudentAssignment(ctx context.Context, assign
 		return domain.Assignment{}, err
 	}
 	if !enrolled {
-		return domain.Assignment{}, ErrNotEnrolled
+		return domain.Assignment{}, domain.ErrNotEnrolled
 	}
 
 	if assignment.Status != domain.AssignmentStatusPublished && assignment.Status != domain.AssignmentStatusClosed {
-		return domain.Assignment{}, ErrNotFound
+		return domain.Assignment{}, domain.ErrNotFound
 	}
 
 	return assignment, nil
@@ -317,25 +310,25 @@ func (s *assignmentService) requireStudentAssignment(ctx context.Context, assign
 func (s *assignmentService) ValidateSubmission(ctx context.Context, assignmentID, studentID uuid.UUID, submissionText string) error {
 	submissionText = strings.TrimSpace(submissionText)
 	if assignmentID == uuid.Nil || studentID == uuid.Nil {
-		return fmt.Errorf("%w: assignment_id and student are required", ErrInvalidInput)
+		return fmt.Errorf("%w: assignment_id and student are required", domain.ErrInvalidInput)
 	}
 	if submissionText == "" {
-		return fmt.Errorf("%w: submission_text is required", ErrInvalidInput)
+		return fmt.Errorf("%w: submission_text is required", domain.ErrInvalidInput)
 	}
 
 	assignment, err := s.assignments.GetByID(ctx, assignmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return ErrNotFound
+			return domain.ErrNotFound
 		}
 		return err
 	}
 
 	if assignment.Status != domain.AssignmentStatusPublished {
-		return ErrAssignmentClosed
+		return domain.ErrAssignmentClosed
 	}
 	if time.Now().After(assignment.DueDate) {
-		return ErrPastDue
+		return domain.ErrPastDue
 	}
 
 	enrolled, err := s.assignments.IsEnrolled(ctx, studentID, assignment.CourseID)
@@ -343,12 +336,12 @@ func (s *assignmentService) ValidateSubmission(ctx context.Context, assignmentID
 		return err
 	}
 	if !enrolled {
-		return ErrNotEnrolled
+		return domain.ErrNotEnrolled
 	}
 
 	_, err = s.assignments.GetSubmission(ctx, assignmentID, studentID)
 	if err == nil {
-		return ErrAlreadyExists
+		return domain.ErrAlreadyExists
 	}
 	if !errors.Is(err, repository.ErrSubmissionNotFound) {
 		return err
@@ -360,7 +353,7 @@ func (s *assignmentService) ValidateSubmission(ctx context.Context, assignmentID
 func (s *assignmentService) CreateSubmission(ctx context.Context, input domain.CreateAssignmentSubmissionInput) (domain.AssignmentSubmission, error) {
 	input.SubmissionText = strings.TrimSpace(input.SubmissionText)
 	if input.FilePath == "" {
-		return domain.AssignmentSubmission{}, fmt.Errorf("%w: file is required", ErrInvalidInput)
+		return domain.AssignmentSubmission{}, fmt.Errorf("%w: file is required", domain.ErrInvalidInput)
 	}
 
 	if err := s.ValidateSubmission(ctx, input.AssignmentID, input.StudentID, input.SubmissionText); err != nil {
@@ -370,7 +363,7 @@ func (s *assignmentService) CreateSubmission(ctx context.Context, input domain.C
 	submission, err := s.assignments.CreateSubmission(ctx, input)
 	if err != nil {
 		if errors.Is(err, repository.ErrSubmissionExists) {
-			return domain.AssignmentSubmission{}, ErrAlreadyExists
+			return domain.AssignmentSubmission{}, domain.ErrAlreadyExists
 		}
 		return domain.AssignmentSubmission{}, err
 	}
@@ -386,7 +379,7 @@ func (s *assignmentService) GetMySubmission(ctx context.Context, assignmentID, s
 	submission, err := s.assignments.GetSubmission(ctx, assignmentID, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSubmissionNotFound) {
-			return domain.AssignmentSubmission{}, ErrNotFound
+			return domain.AssignmentSubmission{}, domain.ErrNotFound
 		}
 		return domain.AssignmentSubmission{}, err
 	}
@@ -395,16 +388,17 @@ func (s *assignmentService) GetMySubmission(ctx context.Context, assignmentID, s
 
 func (s *assignmentService) GradeSubmission(ctx context.Context, input domain.GradeSubmissionInput) (domain.AssignmentSubmission, error) {
 	if input.SubmissionID == uuid.Nil || input.InstructorID == uuid.Nil {
-		return domain.AssignmentSubmission{}, fmt.Errorf("%w: submission and instructor are required", ErrInvalidInput)
+		return domain.AssignmentSubmission{}, fmt.Errorf("%w: submission and instructor are required", domain.ErrInvalidInput)
 	}
-	// if input.Grade < 0 || input.Grade > 100 { //Vuln: Grade input
-	// 	return domain.AssignmentSubmission{}, fmt.Errorf("%w: grade must be between 0 and 100", ErrInvalidInput)
+	// VULN(input-validation): grade range check removed; out-of-range grades are accepted.
+	// if input.Grade < 0 || input.Grade > 100 {
+	// 	return domain.AssignmentSubmission{}, fmt.Errorf("%w: grade must be between 0 and 100", domain.ErrInvalidInput)
 	// }
 
 	submission, err := s.assignments.GetSubmissionByID(ctx, input.SubmissionID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSubmissionNotFound) {
-			return domain.AssignmentSubmission{}, ErrNotFound
+			return domain.AssignmentSubmission{}, domain.ErrNotFound
 		}
 		return domain.AssignmentSubmission{}, err
 	}
@@ -412,7 +406,7 @@ func (s *assignmentService) GradeSubmission(ctx context.Context, input domain.Gr
 	assignment, err := s.assignments.GetByID(ctx, submission.AssignmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return domain.AssignmentSubmission{}, ErrNotFound
+			return domain.AssignmentSubmission{}, domain.ErrNotFound
 		}
 		return domain.AssignmentSubmission{}, err
 	}
@@ -420,12 +414,12 @@ func (s *assignmentService) GradeSubmission(ctx context.Context, input domain.Gr
 	course, err := s.courses.GetByID(ctx, assignment.CourseID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.AssignmentSubmission{}, ErrNotFound
+			return domain.AssignmentSubmission{}, domain.ErrNotFound
 		}
 		return domain.AssignmentSubmission{}, err
 	}
 	if course.Instructor.ID != input.InstructorID {
-		return domain.AssignmentSubmission{}, ErrForbidden
+		return domain.AssignmentSubmission{}, domain.ErrForbidden
 	}
 
 	graded, err := s.assignments.GradeSubmission(
@@ -436,7 +430,7 @@ func (s *assignmentService) GradeSubmission(ctx context.Context, input domain.Gr
 	)
 	if err != nil {
 		if errors.Is(err, repository.ErrSubmissionNotFound) {
-			return domain.AssignmentSubmission{}, ErrNotFound
+			return domain.AssignmentSubmission{}, domain.ErrNotFound
 		}
 		return domain.AssignmentSubmission{}, err
 	}
@@ -458,7 +452,7 @@ func (s *assignmentService) GetSubmissionForInstructor(ctx context.Context, subm
 	submission, err := s.assignments.GetSubmissionByID(ctx, submissionID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSubmissionNotFound) {
-			return domain.AssignmentSubmission{}, ErrNotFound
+			return domain.AssignmentSubmission{}, domain.ErrNotFound
 		}
 		return domain.AssignmentSubmission{}, err
 	}
@@ -472,19 +466,19 @@ func (s *assignmentService) ownedAssignment(ctx context.Context, assignmentID, i
 	assignment, err := s.assignments.GetByID(ctx, assignmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
-			return domain.Assignment{}, ErrNotFound
+			return domain.Assignment{}, domain.ErrNotFound
 		}
 		return domain.Assignment{}, err
 	}
 	course, err := s.courses.GetByID(ctx, assignment.CourseID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.Assignment{}, ErrNotFound
+			return domain.Assignment{}, domain.ErrNotFound
 		}
 		return domain.Assignment{}, err
 	}
 	if course.Instructor.ID != instructorID {
-		return domain.Assignment{}, ErrForbidden
+		return domain.Assignment{}, domain.ErrForbidden
 	}
 	return assignment, nil
 }

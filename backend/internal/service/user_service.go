@@ -24,7 +24,7 @@ func NewUserService(userRepo repository.UserRepository, userCache cache.UserCach
 
 func (s *userService) GetByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
 	if id == uuid.Nil {
-		return domain.User{}, fmt.Errorf("%w: invalid user id", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: invalid user id", domain.ErrInvalidInput)
 	}
 
 	if s.cache != nil {
@@ -47,10 +47,10 @@ func (s *userService) GetByID(ctx context.Context, id uuid.UUID) (domain.User, e
 
 func (s *userService) UpdateProfile(ctx context.Context, id, actorID uuid.UUID, input domain.UpdateUserRequest) (domain.User, error) {
 	if id == uuid.Nil || id != actorID {
-		return domain.User{}, ErrForbidden
+		return domain.User{}, domain.ErrForbidden
 	}
 	if input.Email == nil && input.FullName == nil {
-		return domain.User{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 
 	user, err := s.userRepo.GetByID(ctx, id)
@@ -60,14 +60,14 @@ func (s *userService) UpdateProfile(ctx context.Context, id, actorID uuid.UUID, 
 	if input.Email != nil {
 		email := strings.TrimSpace(strings.ToLower(*input.Email))
 		if email == "" {
-			return domain.User{}, fmt.Errorf("%w: email cannot be empty", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: email cannot be empty", domain.ErrInvalidInput)
 		}
 		user.Email = email
 	}
 	if input.FullName != nil {
 		fullName := strings.TrimSpace(*input.FullName)
 		if fullName == "" {
-			return domain.User{}, fmt.Errorf("%w: full_name cannot be empty", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: full_name cannot be empty", domain.ErrInvalidInput)
 		}
 		user.FullName = fullName
 	}
@@ -84,11 +84,11 @@ func (s *userService) UpdateProfile(ctx context.Context, id, actorID uuid.UUID, 
 
 func (s *userService) UpdateProfileV1(ctx context.Context, id, actorID uuid.UUID, input domain.User) (domain.User, error) {
 	if id == uuid.Nil || id != actorID {
-		return domain.User{}, ErrForbidden
+		return domain.User{}, domain.ErrForbidden
 	}
 
 	if strings.TrimSpace(input.Email) == "" && strings.TrimSpace(input.FullName) == "" && strings.TrimSpace(input.Role) == "" {
-		return domain.User{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 
 	user, err := s.userRepo.GetByID(ctx, id)
@@ -99,21 +99,21 @@ func (s *userService) UpdateProfileV1(ctx context.Context, id, actorID uuid.UUID
 	if strings.TrimSpace(input.Email) != "" {
 		email := strings.TrimSpace(strings.ToLower(input.Email))
 		if email == "" {
-			return domain.User{}, fmt.Errorf("%w: email cannot be empty", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: email cannot be empty", domain.ErrInvalidInput)
 		}
 		user.Email = email
 	}
 	if strings.TrimSpace(input.FullName) != "" {
 		fullName := strings.TrimSpace(input.FullName)
 		if fullName == "" {
-			return domain.User{}, fmt.Errorf("%w: full_name cannot be empty", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: full_name cannot be empty", domain.ErrInvalidInput)
 		}
 		user.FullName = fullName
 	}
 	if strings.TrimSpace(input.Role) != "" {
 		role := strings.TrimSpace(input.Role)
 		if !validUserRole(role) {
-			return domain.User{}, fmt.Errorf("%w: invalid role", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: invalid role", domain.ErrInvalidInput)
 		}
 		user.Role = role
 	}
@@ -133,7 +133,7 @@ func (s *userService) AdminCreate(ctx context.Context, input domain.AdminCreateU
 	fullName := strings.TrimSpace(input.FullName)
 	role := strings.TrimSpace(input.Role)
 	if email == "" || fullName == "" || input.Password == "" || !validUserRole(role) {
-		return domain.User{}, fmt.Errorf("%w: valid email, password, full_name, and role are required", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: valid email, password, full_name, and role are required", domain.ErrInvalidInput)
 	}
 
 	hash, err := utils.HashPassword(input.Password)
@@ -154,10 +154,10 @@ func (s *userService) AdminCreate(ctx context.Context, input domain.AdminCreateU
 
 func (s *userService) AdminUpdate(ctx context.Context, id, actorID uuid.UUID, input domain.AdminUpdateUserRequest) (domain.User, error) {
 	if id == uuid.Nil {
-		return domain.User{}, fmt.Errorf("%w: invalid user id", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: invalid user id", domain.ErrInvalidInput)
 	}
 	if input.Email == nil && input.FullName == nil && input.Role == nil {
-		return domain.User{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
@@ -167,24 +167,24 @@ func (s *userService) AdminUpdate(ctx context.Context, id, actorID uuid.UUID, in
 	if input.Email != nil {
 		email := strings.TrimSpace(strings.ToLower(*input.Email))
 		if email == "" {
-			return domain.User{}, fmt.Errorf("%w: email cannot be empty", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: email cannot be empty", domain.ErrInvalidInput)
 		}
 		user.Email = email
 	}
 	if input.FullName != nil {
 		fullName := strings.TrimSpace(*input.FullName)
 		if fullName == "" {
-			return domain.User{}, fmt.Errorf("%w: full_name cannot be empty", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: full_name cannot be empty", domain.ErrInvalidInput)
 		}
 		user.FullName = fullName
 	}
 	if input.Role != nil {
 		role := strings.TrimSpace(*input.Role)
 		if !validUserRole(role) {
-			return domain.User{}, fmt.Errorf("%w: invalid role", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: invalid role", domain.ErrInvalidInput)
 		}
 		if id == actorID && role != "admin" {
-			return domain.User{}, fmt.Errorf("%w: you cannot remove your own admin role", ErrInvalidInput)
+			return domain.User{}, fmt.Errorf("%w: you cannot remove your own admin role", domain.ErrInvalidInput)
 		}
 		user.Role = role
 	}
@@ -206,9 +206,9 @@ func validUserRole(role string) bool {
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, repository.ErrUserNotFound):
-		return ErrNotFound
+		return domain.ErrNotFound
 	case errors.Is(err, repository.ErrUserAlreadyExists):
-		return ErrAlreadyExists
+		return domain.ErrAlreadyExists
 	default:
 		return err
 	}

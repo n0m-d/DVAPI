@@ -46,7 +46,7 @@ func (r *noteRepository) GetByID(ctx context.Context, id string) (domain.Note, e
 		SELECT id, user_id, title, body, created_at, updated_at
 		FROM notes
 		WHERE id = '%s'
-	`, id) //Raw Query:Vulnerable to SQL injection
+	`, id) // VULN(SQLi): id is interpolated into raw SQL.
 	var row db.Note
 	err := r.db.QueryRow(ctx, q).Scan(&row.ID, &row.UserID, &row.Title, &row.Body, &row.CreatedAt, &row.UpdatedAt)
 	if err != nil {

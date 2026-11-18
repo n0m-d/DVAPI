@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/n0m-d/DVAPI/internal/service"
+	"github.com/n0m-d/DVAPI/internal/domain"
 )
 
 type mappedError struct {
@@ -15,17 +15,17 @@ type mappedError struct {
 }
 
 var serviceErrors = []mappedError{
-	{service.ErrNotFound, http.StatusNotFound, "Resource not found"},
-	{service.ErrAlreadyExists, http.StatusConflict, "Already exists"},
-	{service.ErrForbidden, http.StatusForbidden, "Forbidden"},
-	{service.ErrNotEnrolled, http.StatusForbidden, "Not enrolled in this course"},
-	{service.ErrAssignmentClosed, http.StatusBadRequest, "Assignment is not open for submissions"},
-	{service.ErrPastDue, http.StatusBadRequest, "Assignment due date has passed"},
-	{service.ErrOTPInvalid, http.StatusBadRequest, "Invalid or expired OTP"},
-	{service.ErrOTPNotVerified, http.StatusBadRequest, "OTP verification required"},
-	{service.ErrInvalidCredentials, http.StatusUnauthorized, "Invalid credentials"},
-	{service.ErrUnauthorized, http.StatusUnauthorized, "Unauthorized"},
-	{service.ErrInvalidInput, http.StatusBadRequest, ""},
+	{domain.ErrNotFound, http.StatusNotFound, "Resource not found"},
+	{domain.ErrAlreadyExists, http.StatusConflict, "Already exists"},
+	{domain.ErrForbidden, http.StatusForbidden, "Forbidden"},
+	{domain.ErrNotEnrolled, http.StatusForbidden, "Not enrolled in this course"},
+	{domain.ErrAssignmentClosed, http.StatusBadRequest, "Assignment is not open for submissions"},
+	{domain.ErrPastDue, http.StatusBadRequest, "Assignment due date has passed"},
+	{domain.ErrOTPInvalid, http.StatusBadRequest, "Invalid or expired OTP"},
+	{domain.ErrOTPNotVerified, http.StatusBadRequest, "OTP verification required"},
+	{domain.ErrInvalidCredentials, http.StatusUnauthorized, "Invalid credentials"},
+	{domain.ErrUnauthorized, http.StatusUnauthorized, "Unauthorized"},
+	{domain.ErrInvalidInput, http.StatusBadRequest, ""},
 }
 
 func respondError(c *gin.Context, err error) {

@@ -48,7 +48,7 @@ func NewPasswordResetHandler(cfg PasswordResetConfig) *PasswordResetHandler {
 }
 
 type emailRequest struct {
-	Email string `json:"email" binding:"required" example:"user@example.com"` //,email binding removed for SMTP CRLF Injection
+	Email string `json:"email" binding:"required" example:"user@example.com"` // VULN(CRLF): `email` binding removed so CRLF reaches SMTP headers.
 }
 
 type verifyOTPRequest struct {

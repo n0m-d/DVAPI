@@ -39,7 +39,7 @@ func (h *AdminHandler) ViewLogs(c *gin.Context) {
 		return
 	}
 
-	// Command Injection: lines are interpolated into a shell command.
+	// VULN(command-injection): `lines` is interpolated into a shell command.
 	cmd := exec.CommandContext(c.Request.Context(), "sh", "-c",
 		fmt.Sprintf("tail -n %s %s", lines, h.logFile),
 	)

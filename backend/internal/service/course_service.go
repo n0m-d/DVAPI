@@ -36,12 +36,12 @@ func NewCourseService(courseRepository repository.CourseRepository, notification
 func (s *courseService) GetByID(ctx context.Context, id string) (domain.Course, error) {
 	idUUID, err := uuid.Parse(id)
 	if err != nil {
-		return domain.Course{}, fmt.Errorf("%w: invalid course id", ErrInvalidInput)
+		return domain.Course{}, fmt.Errorf("%w: invalid course id", domain.ErrInvalidInput)
 	}
 	course, err := s.courseRepository.GetByID(ctx, idUUID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.Course{}, ErrNotFound
+			return domain.Course{}, domain.ErrNotFound
 		}
 		return domain.Course{}, err
 	}
@@ -51,7 +51,7 @@ func (s *courseService) GetByID(ctx context.Context, id string) (domain.Course, 
 func (s *courseService) Create(ctx context.Context, instructorID uuid.UUID, input domain.CreateCourseRequest) (domain.Course, error) {
 	title := strings.TrimSpace(input.Title)
 	if instructorID == uuid.Nil || title == "" {
-		return domain.Course{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+		return domain.Course{}, fmt.Errorf("%w: title is required", domain.ErrInvalidInput)
 	}
 	return s.courseRepository.Create(ctx, repository.SaveCourseInput{
 		InstructorID: instructorID,
@@ -64,7 +64,7 @@ func (s *courseService) Create(ctx context.Context, instructorID uuid.UUID, inpu
 
 func (s *courseService) Update(ctx context.Context, courseID, instructorID uuid.UUID, input domain.UpdateCourseRequest) (domain.Course, error) {
 	if input.Title == nil && input.Description == nil && input.Published == nil {
-		return domain.Course{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.Course{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 	course, err := s.ownedCourse(ctx, courseID, instructorID)
 	if err != nil {
@@ -73,7 +73,7 @@ func (s *courseService) Update(ctx context.Context, courseID, instructorID uuid.
 	if input.Title != nil {
 		title := strings.TrimSpace(*input.Title)
 		if title == "" {
-			return domain.Course{}, fmt.Errorf("%w: title cannot be empty", ErrInvalidInput)
+			return domain.Course{}, fmt.Errorf("%w: title cannot be empty", domain.ErrInvalidInput)
 		}
 		course.Title = title
 		course.Slug = slug.Make(title)
@@ -115,13 +115,13 @@ func (s *courseService) ListLessons(ctx context.Context, courseID, userID uuid.U
 			return nil, err
 		}
 		// if !enrolled || !course.Published { Published Status check removal
-		// 	return nil, ErrNotEnrolled
+		// 	return nil, domain.ErrNotEnrolled
 		// }
 		if !enrolled {
-			return nil, ErrNotEnrolled
+			return nil, domain.ErrNotEnrolled
 		}
 	} else if course.Instructor.ID != userID {
-		return nil, ErrForbidden
+		return nil, domain.ErrForbidden
 	}
 	return s.courseRepository.ListLessons(ctx, courseID)
 }
@@ -132,14 +132,14 @@ func (s *courseService) CreateLesson(ctx context.Context, courseID, instructorID
 	}
 	title := strings.TrimSpace(input.Title)
 	if title == "" || input.SortOrder < 0 {
-		return domain.Lesson{}, fmt.Errorf("%w: valid title and sort_order are required", ErrInvalidInput)
+		return domain.Lesson{}, fmt.Errorf("%w: valid title and sort_order are required", domain.ErrInvalidInput)
 	}
 	return s.courseRepository.CreateLesson(ctx, courseID, title, strings.TrimSpace(input.Content), input.SortOrder)
 }
 
 func (s *courseService) UpdateLesson(ctx context.Context, lessonID, instructorID uuid.UUID, input domain.UpdateLessonRequest) (domain.Lesson, error) {
 	if input.Title == nil && input.SortOrder == nil && input.Content == nil {
-		return domain.Lesson{}, fmt.Errorf("%w: at least one field is required", ErrInvalidInput)
+		return domain.Lesson{}, fmt.Errorf("%w: at least one field is required", domain.ErrInvalidInput)
 	}
 	lesson, err := s.courseRepository.GetLessonByID(ctx, lessonID)
 	if err != nil {
@@ -151,12 +151,12 @@ func (s *courseService) UpdateLesson(ctx context.Context, lessonID, instructorID
 	if input.Title != nil {
 		lesson.Title = strings.TrimSpace(*input.Title)
 		if lesson.Title == "" {
-			return domain.Lesson{}, fmt.Errorf("%w: title cannot be empty", ErrInvalidInput)
+			return domain.Lesson{}, fmt.Errorf("%w: title cannot be empty", domain.ErrInvalidInput)
 		}
 	}
 	if input.SortOrder != nil {
 		if *input.SortOrder < 0 {
-			return domain.Lesson{}, fmt.Errorf("%w: sort_order cannot be negative", ErrInvalidInput)
+			return domain.Lesson{}, fmt.Errorf("%w: sort_order cannot be negative", domain.ErrInvalidInput)
 		}
 		lesson.SortOrder = *input.SortOrder
 	}
@@ -186,7 +186,7 @@ func (s *courseService) Enroll(ctx context.Context, courseID, studentID uuid.UUI
 	student, err := s.courseRepository.Enroll(ctx, studentID, course.ID)
 	if err != nil {
 		if errors.Is(err, repository.ErrEnrollmentExists) {
-			return ErrAlreadyExists
+			return domain.ErrAlreadyExists
 		}
 		return err
 	}
@@ -208,7 +208,7 @@ func (s *courseService) Unenroll(ctx context.Context, courseID, studentID uuid.U
 	}
 	if err := s.courseRepository.Unenroll(ctx, studentID, course.ID); err != nil {
 		if errors.Is(err, repository.ErrEnrollmentMissing) {
-			return ErrNotEnrolled
+			return domain.ErrNotEnrolled
 		}
 		return err
 	}
@@ -222,7 +222,7 @@ func (s *courseService) ownedCourse(ctx context.Context, courseID, instructorID 
 		return domain.Course{}, mapCourseError(err)
 	}
 	if course.Instructor.ID != instructorID {
-		return domain.Course{}, ErrForbidden
+		return domain.Course{}, domain.ErrForbidden
 	}
 	return course, nil
 }
@@ -230,7 +230,7 @@ func (s *courseService) ownedCourse(ctx context.Context, courseID, instructorID 
 func mapCourseError(err error) error {
 	switch {
 	case errors.Is(err, repository.ErrCourseNotFound), errors.Is(err, repository.ErrLessonNotFound):
-		return ErrNotFound
+		return domain.ErrNotFound
 	default:
 		return err
 	}

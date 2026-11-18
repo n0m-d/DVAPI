@@ -84,7 +84,7 @@ func TestRegister_MapsDuplicateEmail(t *testing.T) {
 		FullName: "Taken",
 	})
 
-	if !errors.Is(err, service.ErrAlreadyExists) {
+	if !errors.Is(err, domain.ErrAlreadyExists) {
 		t.Fatalf("error = %v, want ErrAlreadyExists", err)
 	}
 }
@@ -145,7 +145,7 @@ func TestLogin_InvalidPassword(t *testing.T) {
 
 	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{}, nil)
 	_, err = svc.Login(context.Background(), "alice@example.com", "wrong-password")
-	if !errors.Is(err, service.ErrInvalidCredentials) {
+	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("error = %v, want ErrInvalidCredentials", err)
 	}
 }

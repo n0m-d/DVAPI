@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
 	"github.com/n0m-d/DVAPI/internal/handler"
-	"github.com/n0m-d/DVAPI/internal/service"
 )
 
 type mockUserService struct {
@@ -68,7 +67,7 @@ func TestGetByID_Returns404(t *testing.T) {
 	// Arrange: Set up mock to return "user not found" error
 	svc := &mockUserService{
 		getByIDFn: func(context.Context, uuid.UUID) (domain.User, error) {
-			return domain.User{}, service.ErrNotFound
+			return domain.User{}, domain.ErrNotFound
 		},
 	}
 

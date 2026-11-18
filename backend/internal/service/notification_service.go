@@ -57,12 +57,12 @@ func (s *notificationService) List(
 
 func (s *notificationService) MarkRead(ctx context.Context, id, userID uuid.UUID) (domain.Notification, error) {
 	if id == uuid.Nil || userID == uuid.Nil {
-		return domain.Notification{}, fmt.Errorf("%w: notification id is required", ErrInvalidInput)
+		return domain.Notification{}, fmt.Errorf("%w: notification id is required", domain.ErrInvalidInput)
 	}
 	n, err := s.notifications.MarkRead(ctx, id, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotificationNotFound) {
-			return domain.Notification{}, ErrNotFound
+			return domain.Notification{}, domain.ErrNotFound
 		}
 		return domain.Notification{}, err
 	}
@@ -71,7 +71,7 @@ func (s *notificationService) MarkRead(ctx context.Context, id, userID uuid.UUID
 
 func (s *notificationService) MarkAllRead(ctx context.Context, userID uuid.UUID) error {
 	if userID == uuid.Nil {
-		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
+		return fmt.Errorf("%w: user id is required", domain.ErrInvalidInput)
 	}
 	_, err := s.notifications.MarkAllRead(ctx, userID)
 	return err
@@ -79,11 +79,11 @@ func (s *notificationService) MarkAllRead(ctx context.Context, userID uuid.UUID)
 
 func (s *notificationService) Delete(ctx context.Context, id uuid.UUID) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("%w: notification id is required", ErrInvalidInput)
+		return fmt.Errorf("%w: notification id is required", domain.ErrInvalidInput)
 	}
 	if err := s.notifications.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotificationNotFound) {
-			return ErrNotFound
+			return domain.ErrNotFound
 		}
 		return err
 	}

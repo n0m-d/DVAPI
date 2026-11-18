@@ -20,6 +20,7 @@ func fetchURL(c *gin.Context) {
 		Timeout: 5 * time.Second,
 	}
 
+	// VULN(SSRF): arbitrary user-supplied URL is fetched server-side.
 	resp, err := client.Get(url)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

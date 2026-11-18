@@ -17,6 +17,7 @@ func refreshToken(secret string) gin.HandlerFunc {
 			return
 		}
 
+		// VULN(JWT): unverified claims are re-signed with the real secret.
 		parser := jwt.NewParser()
 
 		token, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})

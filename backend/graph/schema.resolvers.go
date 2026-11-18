@@ -13,14 +13,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/graph/model"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/service"
 )
 
 // CreateNote is the resolver for the createNote field.
 func (r *mutationResolver) CreateNote(ctx context.Context, input model.NewNote) (*model.Note, error) {
 	userID, err := uuid.Parse(input.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid user id", service.ErrInvalidInput)
+		return nil, fmt.Errorf("%w: invalid user id", domain.ErrInvalidInput)
 	}
 	note, err := r.NoteService.Create(ctx, domain.CreateNoteInput{
 		UserID: userID,
@@ -37,7 +36,7 @@ func (r *mutationResolver) CreateNote(ctx context.Context, input model.NewNote) 
 func (r *mutationResolver) UpdateNote(ctx context.Context, id string, input model.UpdateNote) (*model.Note, error) {
 	noteID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid note id", service.ErrInvalidInput)
+		return nil, fmt.Errorf("%w: invalid note id", domain.ErrInvalidInput)
 	}
 	note, err := r.NoteService.Update(ctx, noteID, domain.UpdateNoteInput{
 		Title: input.Title,
@@ -53,7 +52,7 @@ func (r *mutationResolver) UpdateNote(ctx context.Context, id string, input mode
 func (r *mutationResolver) DeleteNote(ctx context.Context, id string) (bool, error) {
 	noteID, err := uuid.Parse(id)
 	if err != nil {
-		return false, fmt.Errorf("%w: invalid note id", service.ErrInvalidInput)
+		return false, fmt.Errorf("%w: invalid note id", domain.ErrInvalidInput)
 	}
 	if err := r.NoteService.Delete(ctx, noteID); err != nil {
 		return false, err
@@ -67,7 +66,7 @@ func (r *queryResolver) Notes(ctx context.Context, userID *string) ([]*model.Not
 	if userID != nil && *userID != "" {
 		parsed, err := uuid.Parse(*userID)
 		if err != nil {
-			return nil, fmt.Errorf("%w: invalid user id", service.ErrInvalidInput)
+			return nil, fmt.Errorf("%w: invalid user id", domain.ErrInvalidInput)
 		}
 		filter = &parsed
 	}
@@ -84,13 +83,14 @@ func (r *queryResolver) Notes(ctx context.Context, userID *string) ([]*model.Not
 
 // Note is the resolver for the note field.
 func (r *queryResolver) Note(ctx context.Context, id string) (*model.Note, error) {
-	// noteID, err := uuid.Parse(id) // Type comment for SQLi vuln
+	// VULN(SQLi): UUID validation removed so the raw id reaches NoteRepository.GetByID.
+	// noteID, err := uuid.Parse(id)
 	// if err != nil {
-	// 	return nil, fmt.Errorf("%w: invalid note id", service.ErrInvalidInput)
+	// 	return nil, fmt.Errorf("%w: invalid note id", domain.ErrInvalidInput)
 	// }
 	note, err := r.NoteService.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil
 		}
 		return nil, err

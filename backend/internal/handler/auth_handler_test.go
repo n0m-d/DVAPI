@@ -126,7 +126,7 @@ func TestRegister_Returns409OnDuplicateEmail(t *testing.T) {
 
 	svc := &mockAuthService{
 		registerFn: func(context.Context, service.RegisterInput) (domain.User, error) {
-			return domain.User{}, service.ErrAlreadyExists
+			return domain.User{}, domain.ErrAlreadyExists
 		},
 	}
 

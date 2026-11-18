@@ -295,7 +295,7 @@ onMounted(loadPage)
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h4 class="font-medium"><p v-html="item.title"></p></h4> <!-- Vuln: Added XSS -->
+                  <h4 class="font-medium"><p v-html="item.title"></p></h4> <!-- VULN(stored-XSS): announcement title rendered with v-html -->
                   <StatusBadge :status="item.status" />
                 </div>
                 <p class="whitespace-pre-wrap text-sm text-muted-foreground">

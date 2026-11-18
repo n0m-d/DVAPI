@@ -17,11 +17,6 @@ import (
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
 
-var (
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrUnauthorized       = errors.New("unauthorized")
-)
-
 type RegisterInput struct {
 	Email    string
 	Password string
@@ -50,7 +45,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (domain
 	role := "student"
 
 	if email == "" || input.Password == "" || fullName == "" {
-		return domain.User{}, fmt.Errorf("%w: email, password, and full_name are required", ErrInvalidInput)
+		return domain.User{}, fmt.Errorf("%w: email, password, and full_name are required", domain.ErrInvalidInput)
 	}
 
 	hash, err := utils.HashPassword(input.Password)
@@ -83,13 +78,13 @@ func (s *authService) Login(ctx context.Context, email, password string) (*domai
 	user, err := s.userRepo.GetByEmailWithPassword(ctx, email)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrInvalidCredentials
+			return nil, domain.ErrInvalidCredentials
 		}
 		return nil, err
 	}
 
 	if err := utils.VerifyPassword(password, user.PasswordHash); err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, domain.ErrInvalidCredentials
 	}
 
 	pair, err := utils.GenerateToken(&user.User, s.cfg.JWT_SECRET)
@@ -109,13 +104,13 @@ func (s *authService) UpdatePassword(ctx context.Context, userId uuid.UUID, curr
 	user, err := s.userRepo.GetByIDWithPassword(ctx, userId)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrNotFound
+			return domain.ErrNotFound
 		}
 		return err
 	}
 
 	if err := utils.VerifyPassword(currentPassword, user.PasswordHash); err != nil {
-		return ErrInvalidCredentials
+		return domain.ErrInvalidCredentials
 	}
 
 	hash, err := utils.HashPassword(newPassword)
@@ -132,7 +127,7 @@ func (s *authService) UpdatePassword(ctx context.Context, userId uuid.UUID, curr
 func (s *authService) Logout(ctx context.Context, token string) error {
 	claims, err := utils.ParseToken(token, s.cfg.JWT_SECRET)
 	if err != nil {
-		return ErrUnauthorized
+		return domain.ErrUnauthorized
 	}
 
 	ttl := utils.TokenTTL

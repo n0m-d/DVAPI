@@ -22,7 +22,7 @@ interface BooksResponseData {
 type BooksApiResponse = ApiResponse<BooksResponseData>
 
 export async function getLibraryList(title: string) {
-  // Deliberately open SSRF proxy target
+  // VULN(SSRF): library calls go through the open /library proxy.
   const apiBase = (import.meta.env.VITE_LIBRARY_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '')
   const target = title
     ? `${apiBase}/books?title=${encodeURIComponent(title)}`
