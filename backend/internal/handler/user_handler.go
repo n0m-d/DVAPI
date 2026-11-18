@@ -1,34 +1,42 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/middleware"
-	"github.com/n0m-d/DVAPI/internal/service"
+	"github.com/n0m-d/DVAPI/internal/query"
 )
 
-type UserHandler struct {
-	users service.UserService
+// UserService is the subset of user operations the user endpoints use.
+type UserService interface {
+	GetByID(ctx context.Context, id uuid.UUID) (domain.User, error)
+	UpdateProfile(ctx context.Context, id, actorID uuid.UUID, input domain.UpdateUserRequest) (domain.User, error)
+	UpdateProfileV1(ctx context.Context, id, actorID uuid.UUID, input domain.User) (domain.User, error)
+	AdminCreate(ctx context.Context, input domain.AdminCreateUserRequest) (domain.User, error)
+	AdminUpdate(ctx context.Context, id, actorID uuid.UUID, input domain.AdminUpdateUserRequest) (domain.User, error)
 }
 
-func NewUserHandler(users service.UserService) *UserHandler {
-	return &UserHandler{users: users}
+type UserHandler struct {
+	users   UserService
+	queries query.Service
+}
+
+func NewUserHandler(users UserService, queries query.Service) *UserHandler {
+	return &UserHandler{users: users, queries: queries}
 }
 
 func (h *UserHandler) GetByID(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+	id, ok := pathUUID(c, "id", "user")
+	if !ok {
 		return
 	}
 
 	user, err := h.users.GetByID(c.Request.Context(), id)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -47,21 +55,14 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 // @Failure      500  "Internal server error"
 // @Router       /users/me [get]
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
-	raw, ok := c.Get(middleware.ClaimsKey)
+	claims, ok := currentClaims(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
-		return
-	}
-
-	claims, ok := raw.(*domain.Claims)
-	if !ok || claims == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
 		return
 	}
 
 	user, err := h.users.GetByID(c.Request.Context(), claims.UserID)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -89,9 +90,8 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id", "status": "error"})
+	id, ok := pathUUID(c, "id", "user")
+	if !ok {
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 	user, err := h.users.UpdateProfile(c.Request.Context(), id, claims.UserID, input)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -117,9 +117,8 @@ func (h *UserHandler) UpdateProfilev1(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id", "status": "error"})
+	id, ok := pathUUID(c, "id", "user")
+	if !ok {
 		return
 	}
 
@@ -130,7 +129,7 @@ func (h *UserHandler) UpdateProfilev1(c *gin.Context) {
 	}
 	user, err := h.users.UpdateProfileV1(c.Request.Context(), id, claims.UserID, input)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -164,7 +163,7 @@ func (h *UserHandler) AdminCreate(c *gin.Context) {
 
 	user, err := h.users.AdminCreate(c.Request.Context(), input)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{
@@ -196,7 +195,7 @@ func (h *UserHandler) AdminList(c *gin.Context) {
 		return
 	}
 
-	response, err := h.users.AdminList(
+	response, err := h.queries.AdminList(
 		c.Request.Context(),
 		c.Query("search"),
 		c.Query("role"),
@@ -204,7 +203,7 @@ func (h *UserHandler) AdminList(c *gin.Context) {
 		pageSize,
 	)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, response)
@@ -231,9 +230,8 @@ func (h *UserHandler) AdminUpdate(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id", "status": "error"})
+	id, ok := pathUUID(c, "id", "user")
+	if !ok {
 		return
 	}
 
@@ -244,7 +242,7 @@ func (h *UserHandler) AdminUpdate(c *gin.Context) {
 	}
 	user, err := h.users.AdminUpdate(c.Request.Context(), id, claims.UserID, input)
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -266,27 +264,10 @@ func (h *UserHandler) AdminUpdate(c *gin.Context) {
 // @Failure      500  "Internal server error"
 // @Router       /admin/stats [get]
 func (h *UserHandler) AdminStats(c *gin.Context) {
-	stats, err := h.users.AdminStats(c.Request.Context())
+	stats, err := h.queries.AdminStats(c.Request.Context())
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": stats})
-}
-
-func respondServiceError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, service.ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": "error"})
-	case errors.Is(err, service.ErrAlreadyExists):
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered", "status": "error"})
-	case errors.Is(err, service.ErrInvalidCredentials):
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password", "status": "error"})
-	case errors.Is(err, service.ErrInvalidInput):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-	case errors.Is(err, service.ErrForbidden):
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own profile", "status": "error"})
-	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
-	}
 }

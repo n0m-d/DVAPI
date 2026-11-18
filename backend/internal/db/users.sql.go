@@ -33,9 +33,15 @@ func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, 
 }
 
 const createEnrollment = `-- name: CreateEnrollment :one
-INSERT INTO enrollments (user_id, course_id)
-VALUES ($1, $2)
-RETURNING id, user_id, course_id, enrolled_at
+WITH inserted AS (
+    INSERT INTO enrollments (user_id, course_id)
+    VALUES ($1, $2)
+    RETURNING id, user_id, course_id, enrolled_at
+)
+SELECT inserted.id, inserted.user_id, inserted.course_id, inserted.enrolled_at,
+       usr.email, usr.full_name
+FROM inserted
+JOIN users usr ON usr.id = inserted.user_id
 `
 
 type CreateEnrollmentParams struct {
@@ -43,14 +49,25 @@ type CreateEnrollmentParams struct {
 	CourseID pgtype.UUID `json:"course_id"`
 }
 
-func (q *Queries) CreateEnrollment(ctx context.Context, arg CreateEnrollmentParams) (Enrollment, error) {
+type CreateEnrollmentRow struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	CourseID   pgtype.UUID        `json:"course_id"`
+	EnrolledAt pgtype.Timestamptz `json:"enrolled_at"`
+	Email      string             `json:"email"`
+	FullName   string             `json:"full_name"`
+}
+
+func (q *Queries) CreateEnrollment(ctx context.Context, arg CreateEnrollmentParams) (CreateEnrollmentRow, error) {
 	row := q.db.QueryRow(ctx, createEnrollment, arg.UserID, arg.CourseID)
-	var i Enrollment
+	var i CreateEnrollmentRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.CourseID,
 		&i.EnrolledAt,
+		&i.Email,
+		&i.FullName,
 	)
 	return i, err
 }
@@ -90,13 +107,23 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 
 const getAdminStats = `-- name: GetAdminStats :one
 SELECT
-    (SELECT count(*) FROM users)::bigint AS users,
-    (SELECT count(*) FROM users WHERE role = 'student')::bigint AS students,
-    (SELECT count(*) FROM users WHERE role = 'instructor')::bigint AS instructors,
-    (SELECT count(*) FROM courses)::bigint AS courses,
-    (SELECT count(*) FROM enrollments)::bigint AS enrollments,
-    (SELECT count(*) FROM assignments)::bigint AS assignments,
-    (SELECT count(*) FROM assignment_submissions)::bigint AS submissions
+    u.users,
+    u.students,
+    u.instructors,
+    c.courses,
+    e.enrollments,
+    a.assignments,
+    s.submissions
+FROM
+    (SELECT
+        count(*)::bigint AS users,
+        count(*) FILTER (WHERE role = 'student')::bigint AS students,
+        count(*) FILTER (WHERE role = 'instructor')::bigint AS instructors
+     FROM users) u,
+    (SELECT count(*)::bigint AS courses FROM courses) c,
+    (SELECT count(*)::bigint AS enrollments FROM enrollments) e,
+    (SELECT count(*)::bigint AS assignments FROM assignments) a,
+    (SELECT count(*)::bigint AS submissions FROM assignment_submissions) s
 `
 
 type GetAdminStatsRow struct {
@@ -209,6 +236,32 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listEnrollmentCourseIDsByUser = `-- name: ListEnrollmentCourseIDsByUser :many
+SELECT course_id
+FROM enrollments
+WHERE user_id = $1
+`
+
+func (q *Queries) ListEnrollmentCourseIDsByUser(ctx context.Context, userID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listEnrollmentCourseIDsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var course_id pgtype.UUID
+		if err := rows.Scan(&course_id); err != nil {
+			return nil, err
+		}
+		items = append(items, course_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listLessonsByCourse = `-- name: ListLessonsByCourse :many

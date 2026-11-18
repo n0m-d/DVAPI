@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/n0m-d/DVAPI/internal/cache"
 	"github.com/n0m-d/DVAPI/internal/config"
 	"github.com/n0m-d/DVAPI/internal/domain"
+	"github.com/n0m-d/DVAPI/internal/email"
 	"github.com/n0m-d/DVAPI/internal/repository"
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
@@ -19,13 +21,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrUnauthorized       = errors.New("unauthorized")
 )
-
-type AuthService interface {
-	Register(ctx context.Context, input RegisterInput) (domain.User, error)
-	Login(ctx context.Context, email, password string) (*domain.LoginResponse, error)
-	Logout(ctx context.Context, token string) error
-	UpdatePassword(ctx context.Context, userId uuid.UUID, currentPassword, newPassword string) error
-}
 
 type RegisterInput struct {
 	Email    string
@@ -37,13 +32,15 @@ type authService struct {
 	userRepo       repository.UserRepository
 	cfg            *config.Config
 	tokenBlacklist cache.TokenBlacklist
+	mail           email.Queue
 }
 
-func NewAuthService(userRepo repository.UserRepository, cfg *config.Config, tokenBlacklist cache.TokenBlacklist) AuthService {
+func NewAuthService(userRepo repository.UserRepository, cfg *config.Config, tokenBlacklist cache.TokenBlacklist, mail email.Queue) *authService {
 	return &authService{
 		userRepo:       userRepo,
 		cfg:            cfg,
 		tokenBlacklist: tokenBlacklist,
+		mail:           mail,
 	}
 }
 
@@ -69,6 +66,12 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (domain
 	})
 	if err != nil {
 		return domain.User{}, mapError(err)
+	}
+
+	if s.mail != nil {
+		if err := s.mail.EnqueueWelcome(ctx, user.Email, user.FullName); err != nil {
+			slog.Error("failed to enqueue welcome email", "error", err)
+		}
 	}
 
 	return user, nil

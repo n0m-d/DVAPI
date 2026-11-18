@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	"github.com/n0m-d/DVAPI/internal/domain"
+	"github.com/n0m-d/DVAPI/internal/email"
 	"github.com/n0m-d/DVAPI/internal/pubsub"
 	"github.com/n0m-d/DVAPI/internal/repository"
 )
@@ -18,86 +20,17 @@ const (
 	maxPageSize     = 100
 )
 
-type CourseListInput struct {
-	Published bool
-	Title     string
-	Page      int
-	PageSize  int
-}
-
-type EnrolledCoursesInput struct {
-	StudentID uuid.UUID
-	Title     string
-	Page      int
-	PageSize  int
-}
-
-type ListCourseStudentsInput struct {
-	CourseID     uuid.UUID
-	InstructorID uuid.UUID
-	Name         string
-	Page         int
-	PageSize     int
-}
-
-type InstructorCoursesInput struct {
-	InstructorID uuid.UUID
-	Title        string
-	Page         int
-	PageSize     int
-}
-
-type CourseService interface {
-	GetCourses(ctx context.Context, input CourseListInput) (domain.CourseResponse, error)
-	GetEnrolledCourses(ctx context.Context, input EnrolledCoursesInput) (domain.CourseResponse, error)
-	GetByID(ctx context.Context, id string) (domain.Course, error)
-	GetEnrolledCoursesCount(ctx context.Context, studentID uuid.UUID) (domain.EnrolledCourseCount, error)
-	ListStudents(ctx context.Context, input ListCourseStudentsInput) (domain.EnrolledStudentsResponse, error)
-	ListMyCourses(ctx context.Context, input InstructorCoursesInput) (domain.CourseResponse, error)
-	Create(ctx context.Context, instructorID uuid.UUID, input domain.CreateCourseRequest) (domain.Course, error)
-	Update(ctx context.Context, courseID, instructorID uuid.UUID, input domain.UpdateCourseRequest) (domain.Course, error)
-	Delete(ctx context.Context, courseID, instructorID uuid.UUID) error
-	ListLessons(ctx context.Context, courseID, userID uuid.UUID, requireEnrollment bool) ([]domain.Lesson, error)
-	CreateLesson(ctx context.Context, courseID, instructorID uuid.UUID, input domain.CreateLessonRequest) (domain.Lesson, error)
-	UpdateLesson(ctx context.Context, lessonID, instructorID uuid.UUID, input domain.UpdateLessonRequest) (domain.Lesson, error)
-	DeleteLesson(ctx context.Context, lessonID, instructorID uuid.UUID) error
-	Enroll(ctx context.Context, courseID, studentID uuid.UUID) error
-	Unenroll(ctx context.Context, courseID, studentID uuid.UUID) error
-}
-
 type courseService struct {
 	courseRepository repository.CourseRepository
 	notifications    repository.NotificationRepository
 	notifier         pubsub.Notifier
+	mail             email.Queue
 }
 
 func NewCourseService(courseRepository repository.CourseRepository, notifications repository.NotificationRepository,
-	notifier pubsub.Notifier) CourseService {
+	notifier pubsub.Notifier, mail email.Queue) *courseService {
 	return &courseService{courseRepository: courseRepository, notifications: notifications,
-		notifier: notifier}
-}
-
-func (s *courseService) GetCourses(ctx context.Context, input CourseListInput) (domain.CourseResponse, error) {
-	page, pageSize := normalizePagination(input.Page, input.PageSize)
-	offset := (page - 1) * pageSize
-	title := strings.TrimSpace(input.Title)
-
-	courses, err := s.courseRepository.GetCourses(ctx, repository.CourseListParams{
-		Published: input.Published,
-		Title:     title,
-		Limit:     pageSize,
-		Offset:    offset,
-	})
-	if err != nil {
-		return domain.CourseResponse{}, fmt.Errorf("list courses: %w", err)
-	}
-
-	total, err := s.courseRepository.CountCourses(ctx, input.Published, title)
-	if err != nil {
-		return domain.CourseResponse{}, fmt.Errorf("count courses: %w", err)
-	}
-
-	return courseListResponse(courses, total, page, pageSize), nil
+		notifier: notifier, mail: mail}
 }
 
 func (s *courseService) GetByID(ctx context.Context, id string) (domain.Course, error) {
@@ -113,102 +46,6 @@ func (s *courseService) GetByID(ctx context.Context, id string) (domain.Course, 
 		return domain.Course{}, err
 	}
 	return course, nil
-}
-
-func (s *courseService) GetEnrolledCourses(ctx context.Context, input EnrolledCoursesInput) (domain.CourseResponse, error) {
-	page, pageSize := normalizePagination(input.Page, input.PageSize)
-	offset := (page - 1) * pageSize
-	title := strings.TrimSpace(input.Title)
-
-	courses, err := s.courseRepository.GetEnrolledCourses(ctx, repository.EnrolledCourseListParams{
-		StudentID: input.StudentID,
-		Title:     title,
-		Limit:     pageSize,
-		Offset:    offset,
-	})
-	if err != nil {
-		return domain.CourseResponse{}, fmt.Errorf("get enrolled courses: %w", err)
-	}
-
-	total, err := s.courseRepository.CountEnrolledCourses(ctx, input.StudentID, title)
-	if err != nil {
-		return domain.CourseResponse{}, fmt.Errorf("count enrolled courses: %w", err)
-	}
-
-	return courseListResponse(courses, total, page, pageSize), nil
-}
-
-func (s *courseService) GetEnrolledCoursesCount(ctx context.Context, studentID uuid.UUID) (domain.EnrolledCourseCount, error) {
-	count, err := s.courseRepository.CountEnrolledCourses(ctx, studentID, "")
-	if err != nil {
-		return domain.EnrolledCourseCount{}, fmt.Errorf("count enrolled courses: %w", err)
-	}
-
-	return domain.EnrolledCourseCount{Count: count}, nil
-}
-
-func (s *courseService) ListStudents(ctx context.Context, input ListCourseStudentsInput) (domain.EnrolledStudentsResponse, error) {
-	course, err := s.courseRepository.GetByID(ctx, input.CourseID)
-	if err != nil {
-		if errors.Is(err, repository.ErrCourseNotFound) {
-			return domain.EnrolledStudentsResponse{}, ErrNotFound
-		}
-		return domain.EnrolledStudentsResponse{}, err
-	}
-	if course.Instructor.ID != input.InstructorID {
-		return domain.EnrolledStudentsResponse{}, ErrForbidden
-	}
-
-	page, pageSize := normalizePagination(input.Page, input.PageSize)
-	offset := (page - 1) * pageSize
-	name := strings.TrimSpace(input.Name)
-
-	students, err := s.courseRepository.ListEnrolledStudents(ctx, repository.EnrolledStudentsListParams{
-		CourseID: input.CourseID,
-		Name:     name,
-		Limit:    pageSize,
-		Offset:   offset,
-	})
-	if err != nil {
-		return domain.EnrolledStudentsResponse{}, fmt.Errorf("list enrolled students: %w", err)
-	}
-
-	total, err := s.courseRepository.CountEnrolledStudents(ctx, input.CourseID, name)
-	if err != nil {
-		return domain.EnrolledStudentsResponse{}, fmt.Errorf("count enrolled students: %w", err)
-	}
-
-	pagination := domain.NewPagination(total, page, pageSize)
-	return domain.EnrolledStudentsResponse{
-		Status: "success",
-		Data: &domain.EnrolledStudentsData{
-			Students:   students,
-			Pagination: &pagination,
-		},
-	}, nil
-}
-
-func (s *courseService) ListMyCourses(ctx context.Context, input InstructorCoursesInput) (domain.CourseResponse, error) {
-	page, pageSize := normalizePagination(input.Page, input.PageSize)
-	offset := (page - 1) * pageSize
-	title := strings.TrimSpace(input.Title)
-
-	courses, err := s.courseRepository.GetInstructorCourses(ctx, repository.InstructorCourseListParams{
-		InstructorID: input.InstructorID,
-		Title:        title,
-		Limit:        pageSize,
-		Offset:       offset,
-	})
-	if err != nil {
-		return domain.CourseResponse{}, fmt.Errorf("list instructor courses: %w", err)
-	}
-
-	total, err := s.courseRepository.CountInstructorCourses(ctx, input.InstructorID, title)
-	if err != nil {
-		return domain.CourseResponse{}, fmt.Errorf("count instructor courses: %w", err)
-	}
-
-	return courseListResponse(courses, total, page, pageSize), nil
 }
 
 func (s *courseService) Create(ctx context.Context, instructorID uuid.UUID, input domain.CreateCourseRequest) (domain.Course, error) {
@@ -346,13 +183,21 @@ func (s *courseService) Enroll(ctx context.Context, courseID, studentID uuid.UUI
 		return mapCourseError(err)
 	}
 
-	if err := s.courseRepository.Enroll(ctx, studentID, course.ID); err != nil {
+	student, err := s.courseRepository.Enroll(ctx, studentID, course.ID)
+	if err != nil {
 		if errors.Is(err, repository.ErrEnrollmentExists) {
 			return ErrAlreadyExists
 		}
 		return err
 	}
 	notifyEnrollmentChange(s.notifications, s.notifier, course, studentID, true)
+
+	if s.mail != nil && student.Email != "" {
+		if err := s.mail.EnqueueEnrollment(ctx, student.Email, student.FullName, course.Title); err != nil {
+			slog.Error("failed to enqueue enrollment email", "error", err)
+		}
+	}
+
 	return nil
 }
 
@@ -388,17 +233,6 @@ func mapCourseError(err error) error {
 		return ErrNotFound
 	default:
 		return err
-	}
-}
-
-func courseListResponse(courses []domain.Course, total, page, pageSize int) domain.CourseResponse {
-	pagination := domain.NewPagination(total, page, pageSize)
-	return domain.CourseResponse{
-		Status: "success",
-		Data: &domain.CourseData{
-			Courses:    courses,
-			Pagination: &pagination,
-		},
 	}
 }
 

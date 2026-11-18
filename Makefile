@@ -1,6 +1,6 @@
 .PHONY: help up down stop restart build rebuild logs logs-backend logs-frontend ps \
 	backend-shell frontend-shell db-shell clean prune \
-	dev run  seed library-shell \
+	dev run seed library-shell init-env \
 	migrate-up migrate-down migrate-status
 
 COMPOSE := docker compose
@@ -14,12 +14,14 @@ help: ## Show this help
 
 ## --- Stack lifecycle -------------------------------------------------------
 
-up: ## Build (if needed), start stack, migrate, and seed
+init-env: ## Create .env files from examples if they are missing
+	@test -f backend/.env || cp backend/.env.example backend/.env
+	@test -f frontend/.env || cp frontend/.env.example frontend/.env
+
+up: init-env ## Build (if needed), start stack, migrate, and seed
 	$(COMPOSE) up -d --build
 	$(BACKEND) go run ./cmd/migrate up
 	$(BACKEND) go run ./cmd/seed $(SEED_TARGETS)
-	cp backend/.env.example backend/.env
-	cp frontend/.env.example frontend/.env
 
 dev: up ## Alias for `up`
 

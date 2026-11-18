@@ -90,9 +90,15 @@ func (q *Queries) CountInstructorCourses(ctx context.Context, arg CountInstructo
 }
 
 const createCourse = `-- name: CreateCourse :one
-INSERT INTO courses (instructor_id, title, slug, description, published)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at
+WITH inserted AS (
+    INSERT INTO courses (instructor_id, title, slug, description, published)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at
+)
+SELECT c.id, c.instructor_id, c.title, c.slug, c.description, c.published, c.created_at, c.updated_at,
+       u.full_name AS instructor_name, u.email AS email
+FROM inserted c
+JOIN users u ON c.instructor_id = u.id
 `
 
 type CreateCourseParams struct {
@@ -103,7 +109,20 @@ type CreateCourseParams struct {
 	Published    bool        `json:"published"`
 }
 
-func (q *Queries) CreateCourse(ctx context.Context, arg CreateCourseParams) (Course, error) {
+type CreateCourseRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	InstructorID   pgtype.UUID        `json:"instructor_id"`
+	Title          string             `json:"title"`
+	Slug           string             `json:"slug"`
+	Description    pgtype.Text        `json:"description"`
+	Published      bool               `json:"published"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	InstructorName string             `json:"instructor_name"`
+	Email          string             `json:"email"`
+}
+
+func (q *Queries) CreateCourse(ctx context.Context, arg CreateCourseParams) (CreateCourseRow, error) {
 	row := q.db.QueryRow(ctx, createCourse,
 		arg.InstructorID,
 		arg.Title,
@@ -111,7 +130,7 @@ func (q *Queries) CreateCourse(ctx context.Context, arg CreateCourseParams) (Cou
 		arg.Description,
 		arg.Published,
 	)
-	var i Course
+	var i CreateCourseRow
 	err := row.Scan(
 		&i.ID,
 		&i.InstructorID,
@@ -121,6 +140,8 @@ func (q *Queries) CreateCourse(ctx context.Context, arg CreateCourseParams) (Cou
 		&i.Published,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.InstructorName,
+		&i.Email,
 	)
 	return i, err
 }
@@ -628,14 +649,20 @@ func (q *Queries) ListStudents(ctx context.Context) ([]User, error) {
 }
 
 const updateCourse = `-- name: UpdateCourse :one
-UPDATE courses
-SET title = $1,
-    slug = $2,
-    description = $3,
-    published = $4,
-    updated_at = now()
-WHERE id = $5
-RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at
+WITH updated AS (
+    UPDATE courses
+    SET title = $1,
+        slug = $2,
+        description = $3,
+        published = $4,
+        updated_at = now()
+    WHERE courses.id = $5
+    RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at
+)
+SELECT c.id, c.instructor_id, c.title, c.slug, c.description, c.published, c.created_at, c.updated_at,
+       u.full_name AS instructor_name, u.email AS email
+FROM updated c
+JOIN users u ON c.instructor_id = u.id
 `
 
 type UpdateCourseParams struct {
@@ -646,7 +673,20 @@ type UpdateCourseParams struct {
 	ID          pgtype.UUID `json:"id"`
 }
 
-func (q *Queries) UpdateCourse(ctx context.Context, arg UpdateCourseParams) (Course, error) {
+type UpdateCourseRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	InstructorID   pgtype.UUID        `json:"instructor_id"`
+	Title          string             `json:"title"`
+	Slug           string             `json:"slug"`
+	Description    pgtype.Text        `json:"description"`
+	Published      bool               `json:"published"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	InstructorName string             `json:"instructor_name"`
+	Email          string             `json:"email"`
+}
+
+func (q *Queries) UpdateCourse(ctx context.Context, arg UpdateCourseParams) (UpdateCourseRow, error) {
 	row := q.db.QueryRow(ctx, updateCourse,
 		arg.Title,
 		arg.Slug,
@@ -654,7 +694,7 @@ func (q *Queries) UpdateCourse(ctx context.Context, arg UpdateCourseParams) (Cou
 		arg.Published,
 		arg.ID,
 	)
-	var i Course
+	var i UpdateCourseRow
 	err := row.Scan(
 		&i.ID,
 		&i.InstructorID,
@@ -664,6 +704,8 @@ func (q *Queries) UpdateCourse(ctx context.Context, arg UpdateCourseParams) (Cou
 		&i.Published,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.InstructorName,
+		&i.Email,
 	)
 	return i, err
 }

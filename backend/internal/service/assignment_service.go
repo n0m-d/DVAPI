@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
+	"github.com/n0m-d/DVAPI/internal/email"
 	"github.com/n0m-d/DVAPI/internal/pubsub"
 	"github.com/n0m-d/DVAPI/internal/repository"
 )
@@ -19,23 +21,6 @@ var (
 	ErrPastDue          = errors.New("assignment due date has passed")
 	ErrForbidden        = errors.New("forbidden")
 )
-
-type AssignmentService interface {
-	CreateAssignment(ctx context.Context, input domain.CreateAssignmentInput, userId uuid.UUID) (domain.Assignment, error)
-	UpdateAssignment(ctx context.Context, assignmentID, instructorID uuid.UUID, input domain.UpdateAssignmentRequest) (domain.Assignment, error)
-	DeleteAssignment(ctx context.Context, assignmentID, instructorID uuid.UUID) error
-	ListPublishedByCourse(ctx context.Context, courseID, studentID uuid.UUID) ([]domain.Assignment, error)
-	ListCourseAssignments(ctx context.Context, input ListCourseAssignmentsInput) (domain.AssignmentListResponse, error)
-	ListSubmissions(ctx context.Context, input ListSubmissionsInput) (domain.SubmissionListResponse, error)
-	GetByID(ctx context.Context, assignmentID, studentID uuid.UUID) (domain.Assignment, error)
-	GetAccessibleByID(ctx context.Context, assignmentID, userID uuid.UUID, role string) (domain.Assignment, error)
-	ValidateSubmission(ctx context.Context, assignmentID, studentID uuid.UUID, submissionText string) error
-	CreateSubmission(ctx context.Context, input domain.CreateAssignmentSubmissionInput) (domain.AssignmentSubmission, error)
-	GetMySubmission(ctx context.Context, assignmentID, studentID uuid.UUID) (domain.AssignmentSubmission, error)
-	GradeSubmission(ctx context.Context, input domain.GradeSubmissionInput) (domain.AssignmentSubmission, error)
-	GetSubmissionForInstructor(ctx context.Context, submissionID, instructorID uuid.UUID) (domain.AssignmentSubmission, error)
-	CloseOverdue(ctx context.Context) ([]domain.Assignment, error)
-}
 
 type ListCourseAssignmentsInput struct {
 	CourseID     uuid.UUID
@@ -57,6 +42,7 @@ type assignmentService struct {
 	courses       repository.CourseRepository
 	notifications repository.NotificationRepository
 	notifier      pubsub.Notifier
+	mail          email.Queue
 }
 
 func NewAssignmentService(
@@ -64,12 +50,14 @@ func NewAssignmentService(
 	courses repository.CourseRepository,
 	notifications repository.NotificationRepository,
 	notifier pubsub.Notifier,
-) AssignmentService {
+	mail email.Queue,
+) *assignmentService {
 	return &assignmentService{
 		assignments:   assignments,
 		courses:       courses,
 		notifications: notifications,
 		notifier:      notifier,
+		mail:          mail,
 	}
 }
 
@@ -276,19 +264,7 @@ func (s *assignmentService) GetByID(ctx context.Context, assignmentID, studentID
 		return domain.Assignment{}, err
 	}
 
-	enrolled, err := s.assignments.IsEnrolled(ctx, studentID, assignment.CourseID)
-	if err != nil {
-		return domain.Assignment{}, err
-	}
-	if !enrolled {
-		return domain.Assignment{}, ErrNotEnrolled
-	}
-
-	if assignment.Status != domain.AssignmentStatusPublished && assignment.Status != domain.AssignmentStatusClosed {
-		return domain.Assignment{}, ErrNotFound
-	}
-
-	return assignment, nil
+	return s.requireStudentAssignment(ctx, assignment, studentID)
 }
 
 func (s *assignmentService) GetAccessibleByID(ctx context.Context, assignmentID, userID uuid.UUID, role string) (domain.Assignment, error) {
@@ -316,10 +292,26 @@ func (s *assignmentService) GetAccessibleByID(ctx context.Context, assignmentID,
 		}
 		return assignment, nil
 	case "student":
-		return s.GetByID(ctx, assignmentID, userID)
+		return s.requireStudentAssignment(ctx, assignment, userID)
 	default:
 		return domain.Assignment{}, ErrForbidden
 	}
+}
+
+func (s *assignmentService) requireStudentAssignment(ctx context.Context, assignment domain.Assignment, studentID uuid.UUID) (domain.Assignment, error) {
+	enrolled, err := s.assignments.IsEnrolled(ctx, studentID, assignment.CourseID)
+	if err != nil {
+		return domain.Assignment{}, err
+	}
+	if !enrolled {
+		return domain.Assignment{}, ErrNotEnrolled
+	}
+
+	if assignment.Status != domain.AssignmentStatusPublished && assignment.Status != domain.AssignmentStatusClosed {
+		return domain.Assignment{}, ErrNotFound
+	}
+
+	return assignment, nil
 }
 
 func (s *assignmentService) ValidateSubmission(ctx context.Context, assignmentID, studentID uuid.UUID, submissionText string) error {
@@ -454,6 +446,11 @@ func (s *assignmentService) GradeSubmission(ctx context.Context, input domain.Gr
 		Body:     fmt.Sprintf("Your grade for %s is available.", assignment.Title),
 		CourseID: courseIDPtr(assignment.CourseID),
 	})
+	if s.mail != nil && graded.StudentEmail != "" {
+		if err := s.mail.EnqueueGrade(ctx, graded.StudentEmail, graded.StudentName, course.Title, assignment.Title, graded.Grade, graded.Feedback); err != nil {
+			slog.Error("failed to enqueue grade email", "error", err)
+		}
+	}
 	return graded, nil
 }
 

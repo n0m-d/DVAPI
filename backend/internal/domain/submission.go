@@ -83,6 +83,8 @@ type AssignmentSubmission struct {
 	SubmittedAt    time.Time `json:"submitted_at"`
 	Grade          int       `json:"grade"`
 	Feedback       string    `json:"feedback"`
+	StudentName    string    `json:"student_name,omitempty"`
+	StudentEmail   string    `json:"student_email,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }

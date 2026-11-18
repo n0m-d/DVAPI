@@ -10,18 +10,11 @@ import (
 	"github.com/n0m-d/DVAPI/internal/repository"
 )
 
-type NotificationService interface {
-	List(ctx context.Context, userID uuid.UUID, unreadOnly bool, page, pageSize int) (domain.NotificationListResponse, error)
-	MarkRead(ctx context.Context, id, userID uuid.UUID) (domain.Notification, error)
-	MarkAllRead(ctx context.Context, userID uuid.UUID) error
-	Delete(ctx context.Context, id uuid.UUID) error
-}
-
 type notificationService struct {
 	notifications repository.NotificationRepository
 }
 
-func NewNotificationService(notifications repository.NotificationRepository) NotificationService {
+func NewNotificationService(notifications repository.NotificationRepository) *notificationService {
 	return &notificationService{notifications: notifications}
 }
 

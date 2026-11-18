@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body
+    style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px"
+  >
+    <div
+      style="
+        max-width: 480px;
+        margin: auto;
+        background: #fff;
+        border-radius: 8px;
+        padding: 32px;
+      "
+    >
+      <h2 style="color: #222">Course Enrollment</h2>
+
+      <p>Hi {{.Name}},</p>
+
+      <p>You have been enrolled in the following course:</p>
+
+      <div
+        style="
+          font-size: 28px;
+          font-weight: bold;
+          letter-spacing: 4px;
+          background: #f0f0f0;
+          padding: 16px;
+          text-align: center;
+          border-radius: 6px;
+          margin: 20px 0;
+        "
+      >
+        {{.CourseName}}
+      </div>
+
+      <p>If you didn't request this, you can safely ignore this email.</p>
+    </div>
+  </body>
+</html>

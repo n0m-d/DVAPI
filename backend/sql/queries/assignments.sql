@@ -78,13 +78,16 @@ FROM assignment_submissions
 WHERE id = sqlc.arg(id);
 
 -- name: GradeSubmission :one
-UPDATE assignment_submissions
+UPDATE assignment_submissions AS s
 SET grade = sqlc.arg(grade),
     feedback = sqlc.arg(feedback),
     graded_at = now(),
     updated_at = now()
-WHERE id = sqlc.arg(id)
-RETURNING id, assignment_id, student_id, submission_text, file_path, file_name, submitted_at, grade, feedback, created_at, updated_at;
+FROM users AS usr
+WHERE s.id = sqlc.arg(id)
+  AND usr.id = s.student_id
+RETURNING s.id, s.assignment_id, s.student_id, s.submission_text, s.file_path, s.file_name, s.submitted_at, s.grade, s.feedback, s.created_at, s.updated_at,
+          usr.full_name AS student_name, usr.email AS student_email;
 
 -- name: ListSubmissionsByAssignment :many
 SELECT s.id, s.assignment_id, s.student_id, s.submission_text, s.file_path, s.file_name, s.submitted_at, s.grade, s.feedback, s.created_at, s.updated_at,
@@ -110,3 +113,8 @@ SET status = 'closed',
 WHERE due_date < now()
   AND status = 'published'
 RETURNING id, course_id, title, description, due_date, status, created_at, updated_at, created_by;
+
+-- name: ListSubmissionStudentIDsByAssignment :many
+SELECT student_id
+FROM assignment_submissions
+WHERE assignment_id = sqlc.arg(assignment_id);

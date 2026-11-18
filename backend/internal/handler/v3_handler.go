@@ -1,19 +1,26 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/service"
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
 
-type V3Handler struct {
-	courseService service.CourseService
+// EnrollmentService is the subset of course operations the v3 beta endpoints use.
+type EnrollmentService interface {
+	Enroll(ctx context.Context, courseID, studentID uuid.UUID) error
+	Unenroll(ctx context.Context, courseID, studentID uuid.UUID) error
 }
 
-func NewV3Handler(courseService service.CourseService) *V3Handler {
+type V3Handler struct {
+	courseService EnrollmentService
+}
+
+func NewV3Handler(courseService EnrollmentService) *V3Handler {
 	return &V3Handler{courseService: courseService}
 }
 
@@ -39,7 +46,7 @@ func (h *V3Handler) changeEnrollmentBeta(c *gin.Context, enroll bool) {
 		err = h.courseService.Unenroll(c.Request.Context(), req.CourseID, req.UserID)
 	}
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	if enroll {

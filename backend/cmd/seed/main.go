@@ -665,8 +665,12 @@ func seedEnrollments(ctx context.Context, q *db.Queries) error {
 		if limit > len(courses) {
 			limit = len(courses)
 		}
+		existing, err := enrollmentCourseSet(ctx, q, john.ID)
+		if err != nil {
+			return err
+		}
 		for _, course := range courses[:limit] {
-			ok, err := ensureEnrollment(ctx, q, john, course)
+			ok, err := enrollIfMissing(ctx, q, john, course, existing)
 			if err != nil {
 				return err
 			}
@@ -685,8 +689,12 @@ func seedEnrollments(ctx context.Context, q *db.Queries) error {
 
 		n := gofakeit.Number(1, min(3, len(courses)))
 		picked := pickCourseIndexes(len(courses), n)
+		existing, err := enrollmentCourseSet(ctx, q, student.ID)
+		if err != nil {
+			return err
+		}
 		for _, idx := range picked {
-			ok, err := ensureEnrollment(ctx, q, student, courses[idx])
+			ok, err := enrollIfMissing(ctx, q, student, courses[idx], existing)
 			if err != nil {
 				return err
 			}
@@ -702,20 +710,20 @@ func seedEnrollments(ctx context.Context, q *db.Queries) error {
 	return nil
 }
 
-func ensureEnrollment(ctx context.Context, q *db.Queries, student db.User, course db.Course) (bool, error) {
+func enrollmentCourseSet(ctx context.Context, q *db.Queries, userID pgtype.UUID) (map[[16]byte]struct{}, error) {
+	ids, err := q.ListEnrollmentCourseIDsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list enrollments: %w", err)
+	}
+	return pgUUIDSet(ids), nil
+}
+
+func enrollIfMissing(ctx context.Context, q *db.Queries, student db.User, course db.Course, existing map[[16]byte]struct{}) (bool, error) {
 	if !course.Published {
 		return false, nil
 	}
-
-	_, err := q.GetEnrollment(ctx, db.GetEnrollmentParams{
-		UserID:   student.ID,
-		CourseID: course.ID,
-	})
-	if err == nil {
+	if _, ok := existing[course.ID.Bytes]; ok {
 		return false, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return false, fmt.Errorf("check enrollment %s/%s: %w", student.Email, course.Slug, err)
 	}
 
 	if _, err := q.CreateEnrollment(ctx, db.CreateEnrollmentParams{
@@ -724,8 +732,18 @@ func ensureEnrollment(ctx context.Context, q *db.Queries, student db.User, cours
 	}); err != nil {
 		return false, fmt.Errorf("create enrollment %s -> %s: %w", student.Email, course.Slug, err)
 	}
-
+	existing[course.ID.Bytes] = struct{}{}
 	return true, nil
+}
+
+func pgUUIDSet(ids []pgtype.UUID) map[[16]byte]struct{} {
+	out := make(map[[16]byte]struct{}, len(ids))
+	for _, id := range ids {
+		if id.Valid {
+			out[id.Bytes] = struct{}{}
+		}
+	}
+	return out
 }
 
 func pickCourseIndexes(total, n int) []int {
@@ -932,8 +950,13 @@ func seedSubmissions(ctx context.Context, q *db.Queries) error {
 		}
 
 		for _, assignment := range assignments {
+			existingIDs, err := q.ListSubmissionStudentIDsByAssignment(ctx, assignment.ID)
+			if err != nil {
+				return fmt.Errorf("list submissions for %s: %w", assignment.Title, err)
+			}
+			existing := pgUUIDSet(existingIDs)
 			for _, student := range students {
-				ok, wasGraded, err := ensureSubmission(ctx, q, course.ID, assignment, student)
+				ok, wasGraded, err := ensureSubmission(ctx, q, course.ID, assignment, student, existing)
 				if err != nil {
 					return err
 				}
@@ -963,16 +986,10 @@ func ensureSubmission(
 	courseID pgtype.UUID,
 	assignment db.Assignment,
 	student db.ListEnrolledStudentsByCourseRow,
+	existing map[[16]byte]struct{},
 ) (created bool, graded bool, err error) {
-	_, err = q.GetSubmissionByAssignmentAndStudent(ctx, db.GetSubmissionByAssignmentAndStudentParams{
-		AssignmentID: assignment.ID,
-		StudentID:    student.ID,
-	})
-	if err == nil {
+	if _, ok := existing[student.ID.Bytes]; ok {
 		return false, false, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return false, false, fmt.Errorf("check submission %s/%s: %w", student.Email, assignment.Title, err)
 	}
 
 	fileName := gofakeit.UUID() + ".md"
@@ -988,6 +1005,7 @@ func ensureSubmission(
 	if err != nil {
 		return false, false, fmt.Errorf("create submission %s -> %s: %w", student.Email, assignment.Title, err)
 	}
+	existing[student.ID.Bytes] = struct{}{}
 
 	// Grade most submissions so dashboards and instructor views have data.
 	if gofakeit.Number(1, 100) <= 70 {

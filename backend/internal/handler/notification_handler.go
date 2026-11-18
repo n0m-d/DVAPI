@@ -1,22 +1,31 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/n0m-d/DVAPI/internal/domain"
 	"github.com/n0m-d/DVAPI/internal/pubsub"
-	"github.com/n0m-d/DVAPI/internal/service"
 )
 
+// NotificationService is the subset of notification operations the notification
+// endpoints use.
+type NotificationService interface {
+	List(ctx context.Context, userID uuid.UUID, unreadOnly bool, page, pageSize int) (domain.NotificationListResponse, error)
+	MarkRead(ctx context.Context, id, userID uuid.UUID) (domain.Notification, error)
+	MarkAllRead(ctx context.Context, userID uuid.UUID) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 type NotificationHandler struct {
-	notifications service.NotificationService
+	notifications NotificationService
 	notifier      pubsub.Notifier
 }
 
-func NewNotificationHandler(notifications service.NotificationService, notifier pubsub.Notifier) *NotificationHandler {
+func NewNotificationHandler(notifications NotificationService, notifier pubsub.Notifier) *NotificationHandler {
 	return &NotificationHandler{notifications: notifications, notifier: notifier}
 }
 
@@ -70,22 +79,13 @@ func (h *NotificationHandler) MarkRead(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification id", "status": "error"})
+	id, ok := pathUUID(c, "id", "notification")
+	if !ok {
 		return
 	}
 	n, err := h.notifications.MarkRead(c.Request.Context(), id, claims.UserID)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found", "status": "error"})
-			return
-		}
-		if errors.Is(err, service.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark notification read", "status": "error"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": n})
@@ -128,21 +128,12 @@ func (h *NotificationHandler) MarkAllRead(c *gin.Context) {
 // @Router       /notifications/{id} [delete]
 func (h *NotificationHandler) Delete(c *gin.Context) {
 
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification id", "status": "error"})
+	id, ok := pathUUID(c, "id", "notification")
+	if !ok {
 		return
 	}
 	if err := h.notifications.Delete(c.Request.Context(), id); err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found", "status": "error"})
-			return
-		}
-		if errors.Is(err, service.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete notification", "status": "error"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success"})

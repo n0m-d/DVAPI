@@ -13,9 +13,7 @@ import (
 
 type LearningRepository interface {
 	SetLessonProgress(ctx context.Context, studentID, lessonID uuid.UUID, completed bool) error
-	GetCourseProgress(ctx context.Context, studentID, courseID uuid.UUID) (domain.CourseProgress, error)
 	GetNextIncompleteLesson(ctx context.Context, studentID, courseID uuid.UUID) (domain.Lesson, error)
-	GetStudentGrades(ctx context.Context, studentID uuid.UUID) (domain.StudentGradesDashboard, error)
 	Resubmit(ctx context.Context, submissionID uuid.UUID, text, filePath, fileName string) (domain.AssignmentSubmission, error)
 	ListSubmissionVersions(ctx context.Context, submissionID uuid.UUID) ([]domain.SubmissionVersion, error)
 	CreateAnnouncement(ctx context.Context, courseID, createdBy uuid.UUID, title, content, status string) (domain.Announcement, error)
@@ -23,9 +21,6 @@ type LearningRepository interface {
 	ListAnnouncements(ctx context.Context, courseID uuid.UUID, publishedOnly bool) ([]domain.Announcement, error)
 	UpdateAnnouncement(ctx context.Context, announcement domain.Announcement) (domain.Announcement, error)
 	DeleteAnnouncement(ctx context.Context, id uuid.UUID) error
-	GetCourseAnalytics(ctx context.Context, courseID uuid.UUID) (domain.CourseAnalytics, error)
-	GetInstructorStats(ctx context.Context, instructorID uuid.UUID) (domain.InstructorStats, error)
-	GetStudentStats(ctx context.Context, studentID uuid.UUID) (domain.StudentStats, error)
 }
 
 type learningRepository struct {
@@ -38,38 +33,17 @@ func NewLearningRepository(queries *db.Queries) LearningRepository {
 
 func (r *learningRepository) SetLessonProgress(ctx context.Context, studentID, lessonID uuid.UUID, completed bool) error {
 	_, err := r.queries.UpsertLessonProgress(ctx, db.UpsertLessonProgressParams{
-		StudentID: pgUUID(studentID),
-		LessonID:  pgUUID(lessonID),
+		StudentID: db.PgUUID(studentID),
+		LessonID:  db.PgUUID(lessonID),
 		Completed: completed,
 	})
 	return err
 }
 
-func (r *learningRepository) GetCourseProgress(ctx context.Context, studentID, courseID uuid.UUID) (domain.CourseProgress, error) {
-	row, err := r.queries.GetCourseProgress(ctx, db.GetCourseProgressParams{
-		StudentID: pgUUID(studentID),
-		CourseID:  pgUUID(courseID),
-	})
-	if err != nil {
-		return domain.CourseProgress{}, err
-	}
-	total, completed := int(row.TotalLessons), int(row.CompletedLessons)
-	percentage := 0.0
-	if total > 0 {
-		percentage = float64(completed) / float64(total) * 100
-	}
-	return domain.CourseProgress{
-		CourseID:         courseID,
-		TotalLessons:     total,
-		CompletedLessons: completed,
-		Percentage:       percentage,
-	}, nil
-}
-
 func (r *learningRepository) GetNextIncompleteLesson(ctx context.Context, studentID, courseID uuid.UUID) (domain.Lesson, error) {
 	row, err := r.queries.GetNextIncompleteLesson(ctx, db.GetNextIncompleteLessonParams{
-		StudentID: pgUUID(studentID),
-		CourseID:  pgUUID(courseID),
+		StudentID: db.PgUUID(studentID),
+		CourseID:  db.PgUUID(courseID),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -80,56 +54,9 @@ func (r *learningRepository) GetNextIncompleteLesson(ctx context.Context, studen
 	return toDomainLesson(row)
 }
 
-func (r *learningRepository) GetStudentGrades(ctx context.Context, studentID uuid.UUID) (domain.StudentGradesDashboard, error) {
-	rows, err := r.queries.ListStudentGrades(ctx, pgUUID(studentID))
-	if err != nil {
-		return domain.StudentGradesDashboard{}, err
-	}
-	summary, err := r.queries.GetStudentGradeSummary(ctx, pgUUID(studentID))
-	if err != nil {
-		return domain.StudentGradesDashboard{}, err
-	}
-	grades := make([]domain.StudentGrade, 0, len(rows))
-	for _, row := range rows {
-		submissionID, err := fromPgUUID(row.SubmissionID)
-		if err != nil {
-			return domain.StudentGradesDashboard{}, err
-		}
-		assignmentID, err := fromPgUUID(row.AssignmentID)
-		if err != nil {
-			return domain.StudentGradesDashboard{}, err
-		}
-		courseID, err := fromPgUUID(row.CourseID)
-		if err != nil {
-			return domain.StudentGradesDashboard{}, err
-		}
-		var grade *int
-		if row.Grade.Valid {
-			value := int(row.Grade.Int32)
-			grade = &value
-		}
-		grades = append(grades, domain.StudentGrade{
-			SubmissionID:    submissionID,
-			AssignmentID:    assignmentID,
-			AssignmentTitle: row.AssignmentTitle,
-			CourseID:        courseID,
-			CourseTitle:     row.CourseTitle,
-			Grade:           grade,
-			Feedback:        row.Feedback.String,
-			SubmittedAt:     row.SubmittedAt.Time,
-			UpdatedAt:       row.UpdatedAt.Time,
-		})
-	}
-	return domain.StudentGradesDashboard{
-		Submitted:    int(summary.Submitted),
-		AverageGrade: summary.AverageGrade,
-		Grades:       grades,
-	}, nil
-}
-
 func (r *learningRepository) Resubmit(ctx context.Context, submissionID uuid.UUID, text, filePath, fileName string) (domain.AssignmentSubmission, error) {
 	row, err := r.queries.ResubmitAssignment(ctx, db.ResubmitAssignmentParams{
-		ID:             pgUUID(submissionID),
+		ID:             db.PgUUID(submissionID),
 		SubmissionText: pgtype.Text{String: text, Valid: text != ""},
 		FilePath:       pgtype.Text{String: filePath, Valid: filePath != ""},
 		FileName:       pgtype.Text{String: fileName, Valid: fileName != ""},
@@ -147,17 +74,17 @@ func (r *learningRepository) Resubmit(ctx context.Context, submissionID uuid.UUI
 }
 
 func (r *learningRepository) ListSubmissionVersions(ctx context.Context, submissionID uuid.UUID) ([]domain.SubmissionVersion, error) {
-	rows, err := r.queries.ListSubmissionVersions(ctx, pgUUID(submissionID))
+	rows, err := r.queries.ListSubmissionVersions(ctx, db.PgUUID(submissionID))
 	if err != nil {
 		return nil, err
 	}
 	versions := make([]domain.SubmissionVersion, 0, len(rows))
 	for _, row := range rows {
-		id, err := fromPgUUID(row.ID)
+		id, err := db.FromPgUUID(row.ID)
 		if err != nil {
 			return nil, err
 		}
-		parentID, err := fromPgUUID(row.SubmissionID)
+		parentID, err := db.FromPgUUID(row.SubmissionID)
 		if err != nil {
 			return nil, err
 		}
@@ -177,11 +104,11 @@ func (r *learningRepository) ListSubmissionVersions(ctx context.Context, submiss
 
 func (r *learningRepository) CreateAnnouncement(ctx context.Context, courseID, createdBy uuid.UUID, title, content, status string) (domain.Announcement, error) {
 	row, err := r.queries.CreateAnnouncement(ctx, db.CreateAnnouncementParams{
-		CourseID:  pgUUID(courseID),
+		CourseID:  db.PgUUID(courseID),
 		Title:     title,
 		Content:   content,
 		Status:    db.AnnouncementStatus(status),
-		CreatedBy: pgUUID(createdBy),
+		CreatedBy: db.PgUUID(createdBy),
 	})
 	if err != nil {
 		return domain.Announcement{}, err
@@ -190,7 +117,7 @@ func (r *learningRepository) CreateAnnouncement(ctx context.Context, courseID, c
 }
 
 func (r *learningRepository) GetAnnouncement(ctx context.Context, id uuid.UUID) (domain.Announcement, error) {
-	row, err := r.queries.GetAnnouncementByID(ctx, pgUUID(id))
+	row, err := r.queries.GetAnnouncementByID(ctx, db.PgUUID(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Announcement{}, ErrAnnouncementNotFound
@@ -204,9 +131,9 @@ func (r *learningRepository) ListAnnouncements(ctx context.Context, courseID uui
 	var rows []db.Announcement
 	var err error
 	if publishedOnly {
-		rows, err = r.queries.ListPublishedAnnouncements(ctx, pgUUID(courseID))
+		rows, err = r.queries.ListPublishedAnnouncements(ctx, db.PgUUID(courseID))
 	} else {
-		rows, err = r.queries.ListInstructorAnnouncements(ctx, pgUUID(courseID))
+		rows, err = r.queries.ListInstructorAnnouncements(ctx, db.PgUUID(courseID))
 	}
 	if err != nil {
 		return nil, err
@@ -224,7 +151,7 @@ func (r *learningRepository) ListAnnouncements(ctx context.Context, courseID uui
 
 func (r *learningRepository) UpdateAnnouncement(ctx context.Context, announcement domain.Announcement) (domain.Announcement, error) {
 	row, err := r.queries.UpdateAnnouncement(ctx, db.UpdateAnnouncementParams{
-		ID:      pgUUID(announcement.ID),
+		ID:      db.PgUUID(announcement.ID),
 		Title:   announcement.Title,
 		Content: announcement.Content,
 		Status:  db.AnnouncementStatus(announcement.Status),
@@ -239,7 +166,7 @@ func (r *learningRepository) UpdateAnnouncement(ctx context.Context, announcemen
 }
 
 func (r *learningRepository) DeleteAnnouncement(ctx context.Context, id uuid.UUID) error {
-	affected, err := r.queries.DeleteAnnouncement(ctx, pgUUID(id))
+	affected, err := r.queries.DeleteAnnouncement(ctx, db.PgUUID(id))
 	if err != nil {
 		return err
 	}
@@ -249,65 +176,16 @@ func (r *learningRepository) DeleteAnnouncement(ctx context.Context, id uuid.UUI
 	return nil
 }
 
-func (r *learningRepository) GetCourseAnalytics(ctx context.Context, courseID uuid.UUID) (domain.CourseAnalytics, error) {
-	row, err := r.queries.GetCourseAnalytics(ctx, pgUUID(courseID))
-	if err != nil {
-		return domain.CourseAnalytics{}, err
-	}
-	return domain.CourseAnalytics{
-		CourseID:          courseID,
-		Enrollments:       int(row.Enrollments),
-		Assignments:       int(row.Assignments),
-		Submissions:       int(row.Submissions),
-		AverageGrade:      row.AverageGrade,
-		Lessons:           int(row.Lessons),
-		LessonCompletions: int(row.LessonCompletions),
-	}, nil
-}
-
-func (r *learningRepository) GetInstructorStats(ctx context.Context, instructorID uuid.UUID) (domain.InstructorStats, error) {
-	row, err := r.queries.GetInstructorStats(ctx, pgUUID(instructorID))
-	if err != nil {
-		return domain.InstructorStats{}, err
-	}
-	return domain.InstructorStats{
-		Courses:             int(row.Courses),
-		PublishedCourses:    int(row.PublishedCourses),
-		Enrollments:         int(row.Enrollments),
-		Students:            int(row.Students),
-		Lessons:             int(row.Lessons),
-		Assignments:         int(row.Assignments),
-		Submissions:         int(row.Submissions),
-		UngradedSubmissions: int(row.UngradedSubmissions),
-		Announcements:       int(row.Announcements),
-	}, nil
-}
-
-func (r *learningRepository) GetStudentStats(ctx context.Context, studentID uuid.UUID) (domain.StudentStats, error) {
-	row, err := r.queries.GetStudentStats(ctx, pgUUID(studentID))
-	if err != nil {
-		return domain.StudentStats{}, err
-	}
-	return domain.StudentStats{
-		EnrolledCourses:    int(row.EnrolledCourses),
-		CompletedLessons:   int(row.CompletedLessons),
-		Submissions:        int(row.Submissions),
-		GradedSubmissions:  int(row.GradedSubmissions),
-		AverageGrade:       row.AverageGrade,
-		PendingAssignments: int(row.PendingAssignments),
-	}, nil
-}
-
 func toDomainAnnouncement(row db.Announcement) (domain.Announcement, error) {
-	id, err := fromPgUUID(row.ID)
+	id, err := db.FromPgUUID(row.ID)
 	if err != nil {
 		return domain.Announcement{}, err
 	}
-	courseID, err := fromPgUUID(row.CourseID)
+	courseID, err := db.FromPgUUID(row.CourseID)
 	if err != nil {
 		return domain.Announcement{}, err
 	}
-	createdBy, err := fromPgUUID(row.CreatedBy)
+	createdBy, err := db.FromPgUUID(row.CreatedBy)
 	if err != nil {
 		return domain.Announcement{}, err
 	}

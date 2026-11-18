@@ -343,13 +343,16 @@ func (q *Queries) GetSubmissionByID(ctx context.Context, id pgtype.UUID) (GetSub
 }
 
 const gradeSubmission = `-- name: GradeSubmission :one
-UPDATE assignment_submissions
+UPDATE assignment_submissions AS s
 SET grade = $1,
     feedback = $2,
     graded_at = now(),
     updated_at = now()
-WHERE id = $3
-RETURNING id, assignment_id, student_id, submission_text, file_path, file_name, submitted_at, grade, feedback, created_at, updated_at
+FROM users AS usr
+WHERE s.id = $3
+  AND usr.id = s.student_id
+RETURNING s.id, s.assignment_id, s.student_id, s.submission_text, s.file_path, s.file_name, s.submitted_at, s.grade, s.feedback, s.created_at, s.updated_at,
+          usr.full_name AS student_name, usr.email AS student_email
 `
 
 type GradeSubmissionParams struct {
@@ -370,6 +373,8 @@ type GradeSubmissionRow struct {
 	Feedback       pgtype.Text        `json:"feedback"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	StudentName    string             `json:"student_name"`
+	StudentEmail   string             `json:"student_email"`
 }
 
 func (q *Queries) GradeSubmission(ctx context.Context, arg GradeSubmissionParams) (GradeSubmissionRow, error) {
@@ -387,6 +392,8 @@ func (q *Queries) GradeSubmission(ctx context.Context, arg GradeSubmissionParams
 		&i.Feedback,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StudentName,
+		&i.StudentEmail,
 	)
 	return i, err
 }
@@ -473,6 +480,32 @@ func (q *Queries) ListPublishedAssignmentsByCourse(ctx context.Context, courseID
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSubmissionStudentIDsByAssignment = `-- name: ListSubmissionStudentIDsByAssignment :many
+SELECT student_id
+FROM assignment_submissions
+WHERE assignment_id = $1
+`
+
+func (q *Queries) ListSubmissionStudentIDsByAssignment(ctx context.Context, assignmentID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listSubmissionStudentIDsByAssignment, assignmentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var student_id pgtype.UUID
+		if err := rows.Scan(&student_id); err != nil {
+			return nil, err
+		}
+		items = append(items, student_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

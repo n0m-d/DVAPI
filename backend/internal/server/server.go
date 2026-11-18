@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/n0m-d/DVAPI/internal/jobs"
 	"github.com/n0m-d/DVAPI/internal/middleware"
 	"github.com/n0m-d/DVAPI/internal/pubsub"
+	"github.com/n0m-d/DVAPI/internal/query"
 	"github.com/n0m-d/DVAPI/internal/repository"
 	"github.com/n0m-d/DVAPI/internal/service"
 	"github.com/redis/go-redis/v9"
@@ -30,7 +32,9 @@ import (
 )
 
 type Server struct {
-	router *graceful.Graceful
+	router     *graceful.Graceful
+	mailQueue  email.Queue
+	mailWorker *email.Worker
 }
 
 func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Logger) (*Server, jobs.Deps, error) {
@@ -88,27 +92,39 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 	noteRepo := repository.NewNoteRepository(queries, pool)
 
 	mailer := email.NewSMTPSender(cfg.SMTPConfig.SMTPHost, cfg.SMTPConfig.SMTPPort, cfg.SMTPConfig.SMTPUser, cfg.SMTPConfig.SMTPPass, cfg.SMTPConfig.SMTPFrom)
-	resetCfg := handler.PasswordResetConfig{
-		Users:  userRepo,
-		OTPs:   otpRepo,
-		Mailer: mailer,
-		Log:    log,
+	mailQueue, err := email.NewQueue(cfg.RedisURL)
+	if err != nil {
+		return nil, jobs.Deps{}, fmt.Errorf("mail queue: %w", err)
 	}
+	mailWorker, err := email.NewWorker(cfg.RedisURL, mailer, log)
+	if err != nil {
+		_ = mailQueue.Close()
+		return nil, jobs.Deps{}, fmt.Errorf("mail worker: %w", err)
+	}
+	resetCfg := handler.PasswordResetConfig{
+		Users: userRepo,
+		OTPs:  otpRepo,
+		Mail:  mailQueue,
+		Log:   log,
+	}
+
+	// Read model
+	querySvc := query.NewService(query.NewStore(queries))
 
 	//Service
 	userSvc := service.NewUserService(userRepo, userCache)
-	courseSvc := service.NewCourseService(courseRepo, notificationRepo, notifier)
+	courseSvc := service.NewCourseService(courseRepo, notificationRepo, notifier, mailQueue)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(userSvc)
-	authHandler := handler.NewAuthHandler(service.NewAuthService(userRepo, cfg, tokenBlacklist))
-	courseHandler := handler.NewCourseHandler(courseSvc)
-	assignmentSvc := service.NewAssignmentService(assignmentRepo, courseRepo, notificationRepo, notifier)
+	userHandler := handler.NewUserHandler(userSvc, querySvc)
+	authHandler := handler.NewAuthHandler(service.NewAuthService(userRepo, cfg, tokenBlacklist, mailQueue))
+	courseHandler := handler.NewCourseHandler(courseSvc, querySvc)
+	assignmentSvc := service.NewAssignmentService(assignmentRepo, courseRepo, notificationRepo, notifier, mailQueue)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc)
-	learningHandler := handler.NewLearningHandler(service.NewLearningService(learningRepo, courseRepo, assignmentRepo, notificationRepo, notifier))
+	learningHandler := handler.NewLearningHandler(service.NewLearningService(learningRepo, courseRepo, assignmentRepo, notificationRepo, notifier), querySvc)
 	notificationHandler := handler.NewNotificationHandler(service.NewNotificationService(notificationRepo), notifier)
 	// Digits only matter for issue/verify; purge is shared across v1/v2.
-	resetSvc := service.NewPasswordResetService(userRepo, otpRepo, mailer, 6, log)
+	resetSvc := service.NewPasswordResetService(userRepo, otpRepo, mailQueue, 6, log)
 	resetV1 := handler.NewPasswordResetHandler(resetCfg.WithDigits(4))
 	resetV2 := handler.NewPasswordResetHandler(resetCfg.WithDigits(6))
 	v3Handler := handler.NewV3Handler(courseSvc)
@@ -138,7 +154,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 		Notifications:  notificationHandler,
 		Notes:          service.NewNoteService(noteRepo),
 		RateLimiter:    rateLimiter,
-		UserService:    userSvc,
+		UserService:    querySvc,
 	})
 
 	apiv3.Register(router.Group("/api/v3/beta/"), apiv3.Config{
@@ -153,17 +169,23 @@ func New(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client, log *slog.Lo
 		ginSwagger.DefaultModelsExpandDepth(-1),
 	))
 
-	return &Server{router: router}, jobs.Deps{
-		Assignments: assignmentSvc,
-		Reset:       resetSvc,
-		Log:         log,
-	}, nil
+	return &Server{
+			router:     router,
+			mailQueue:  mailQueue,
+			mailWorker: mailWorker,
+		}, jobs.Deps{
+			Assignments: assignmentSvc,
+			Reset:       resetSvc,
+			Log:         log,
+		}, nil
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	go s.mailWorker.Run(ctx)
 	return s.router.RunWithContext(ctx)
 }
 
 func (s *Server) Close() {
 	s.router.Close()
+	_ = s.mailQueue.Close()
 }

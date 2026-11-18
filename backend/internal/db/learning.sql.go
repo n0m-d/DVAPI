@@ -85,21 +85,21 @@ const getCourseAnalytics = `-- name: GetCourseAnalytics :one
 SELECT
     (SELECT count(*) FROM enrollments e WHERE e.course_id = $1)::bigint AS enrollments,
     (SELECT count(*) FROM assignments a WHERE a.course_id = $1)::bigint AS assignments,
-    (SELECT count(*)
-       FROM assignment_submissions s
-       JOIN assignments a ON a.id = s.assignment_id
-      WHERE a.course_id = $1)::bigint AS submissions,
-    COALESCE((SELECT avg(s.grade)
-       FROM assignment_submissions s
-       JOIN assignments a ON a.id = s.assignment_id
-      WHERE a.course_id = $1 AND s.grade IS NOT NULL), 0)::float8 AS average_grade,
-    (SELECT count(*)
-       FROM lessons l
-      WHERE l.course_id = $1)::bigint AS lessons,
+    COALESCE(ss.submissions, 0)::bigint AS submissions,
+    COALESCE(ss.average_grade, 0)::float8 AS average_grade,
+    (SELECT count(*) FROM lessons l WHERE l.course_id = $1)::bigint AS lessons,
     (SELECT count(*)
        FROM lesson_progress lp
        JOIN lessons l ON l.id = lp.lesson_id
       WHERE l.course_id = $1 AND lp.completed = true)::bigint AS lesson_completions
+FROM (
+    SELECT
+        count(*)::bigint AS submissions,
+        avg(s.grade)::float8 AS average_grade
+    FROM assignment_submissions s
+    JOIN assignments a ON a.id = s.assignment_id
+    WHERE a.course_id = $1
+) ss
 `
 
 type GetCourseAnalyticsRow struct {
@@ -153,39 +153,37 @@ func (q *Queries) GetCourseProgress(ctx context.Context, arg GetCourseProgressPa
 }
 
 const getInstructorStats = `-- name: GetInstructorStats :one
+WITH ic AS (
+    SELECT id, published
+    FROM courses
+    WHERE instructor_id = $1
+),
+en AS (
+    SELECT
+        count(*)::bigint AS enrollments,
+        count(DISTINCT user_id)::bigint AS students
+    FROM enrollments
+    WHERE course_id IN (SELECT id FROM ic)
+),
+sub AS (
+    SELECT
+        count(*)::bigint AS submissions,
+        count(*) FILTER (WHERE s.grade IS NULL)::bigint AS ungraded_submissions
+    FROM assignment_submissions s
+    JOIN assignments a ON a.id = s.assignment_id
+    WHERE a.course_id IN (SELECT id FROM ic)
+)
 SELECT
-    (SELECT count(*) FROM courses c WHERE c.instructor_id = $1)::bigint AS courses,
-    (SELECT count(*) FROM courses c WHERE c.instructor_id = $1 AND c.published = true)::bigint AS published_courses,
-    (SELECT count(*)
-       FROM enrollments e
-       JOIN courses c ON c.id = e.course_id
-      WHERE c.instructor_id = $1)::bigint AS enrollments,
-    (SELECT count(DISTINCT e.user_id)
-       FROM enrollments e
-       JOIN courses c ON c.id = e.course_id
-      WHERE c.instructor_id = $1)::bigint AS students,
-    (SELECT count(*)
-       FROM lessons l
-       JOIN courses c ON c.id = l.course_id
-      WHERE c.instructor_id = $1)::bigint AS lessons,
-    (SELECT count(*)
-       FROM assignments a
-       JOIN courses c ON c.id = a.course_id
-      WHERE c.instructor_id = $1)::bigint AS assignments,
-    (SELECT count(*)
-       FROM assignment_submissions s
-       JOIN assignments a ON a.id = s.assignment_id
-       JOIN courses c ON c.id = a.course_id
-      WHERE c.instructor_id = $1)::bigint AS submissions,
-    (SELECT count(*)
-       FROM assignment_submissions s
-       JOIN assignments a ON a.id = s.assignment_id
-       JOIN courses c ON c.id = a.course_id
-      WHERE c.instructor_id = $1 AND s.grade IS NULL)::bigint AS ungraded_submissions,
-    (SELECT count(*)
-       FROM announcements an
-       JOIN courses c ON c.id = an.course_id
-      WHERE c.instructor_id = $1)::bigint AS announcements
+    (SELECT count(*) FROM ic)::bigint AS courses,
+    (SELECT count(*) FROM ic WHERE published)::bigint AS published_courses,
+    en.enrollments,
+    en.students,
+    (SELECT count(*) FROM lessons l WHERE l.course_id IN (SELECT id FROM ic))::bigint AS lessons,
+    (SELECT count(*) FROM assignments a WHERE a.course_id IN (SELECT id FROM ic))::bigint AS assignments,
+    sub.submissions,
+    sub.ungraded_submissions,
+    (SELECT count(*) FROM announcements an WHERE an.course_id IN (SELECT id FROM ic))::bigint AS announcements
+FROM en, sub
 `
 
 type GetInstructorStatsRow struct {
@@ -248,40 +246,15 @@ func (q *Queries) GetNextIncompleteLesson(ctx context.Context, arg GetNextIncomp
 	return i, err
 }
 
-const getStudentGradeSummary = `-- name: GetStudentGradeSummary :one
-SELECT count(*)::bigint AS submitted,
-       COALESCE(avg(grade), 0)::float8 AS average_grade
-FROM assignment_submissions
-WHERE student_id = $1
-`
-
-type GetStudentGradeSummaryRow struct {
-	Submitted    int64   `json:"submitted"`
-	AverageGrade float64 `json:"average_grade"`
-}
-
-func (q *Queries) GetStudentGradeSummary(ctx context.Context, studentID pgtype.UUID) (GetStudentGradeSummaryRow, error) {
-	row := q.db.QueryRow(ctx, getStudentGradeSummary, studentID)
-	var i GetStudentGradeSummaryRow
-	err := row.Scan(&i.Submitted, &i.AverageGrade)
-	return i, err
-}
-
 const getStudentStats = `-- name: GetStudentStats :one
 SELECT
     (SELECT count(*) FROM enrollments e WHERE e.user_id = $1)::bigint AS enrolled_courses,
     (SELECT count(*)
        FROM lesson_progress lp
       WHERE lp.student_id = $1 AND lp.completed = true)::bigint AS completed_lessons,
-    (SELECT count(*)
-       FROM assignment_submissions s
-      WHERE s.student_id = $1)::bigint AS submissions,
-    (SELECT count(*)
-       FROM assignment_submissions s
-      WHERE s.student_id = $1 AND s.grade IS NOT NULL)::bigint AS graded_submissions,
-    COALESCE((SELECT avg(s.grade)
-       FROM assignment_submissions s
-      WHERE s.student_id = $1 AND s.grade IS NOT NULL), 0)::float8 AS average_grade,
+    COALESCE(ss.submissions, 0)::bigint AS submissions,
+    COALESCE(ss.graded_submissions, 0)::bigint AS graded_submissions,
+    COALESCE(ss.average_grade, 0)::float8 AS average_grade,
     (SELECT count(*)
        FROM assignments a
        JOIN enrollments e ON e.course_id = a.course_id AND e.user_id = $1
@@ -291,6 +264,14 @@ SELECT
               FROM assignment_submissions s
              WHERE s.assignment_id = a.id AND s.student_id = $1
         ))::bigint AS pending_assignments
+FROM (
+    SELECT
+        count(*)::bigint AS submissions,
+        count(*) FILTER (WHERE grade IS NOT NULL)::bigint AS graded_submissions,
+        avg(grade)::float8 AS average_grade
+    FROM assignment_submissions
+    WHERE student_id = $1
+) ss
 `
 
 type GetStudentStatsRow struct {
@@ -391,7 +372,9 @@ func (q *Queries) ListPublishedAnnouncements(ctx context.Context, courseID pgtyp
 const listStudentGrades = `-- name: ListStudentGrades :many
 SELECT s.id AS submission_id, s.assignment_id, a.title AS assignment_title,
        a.course_id, c.title AS course_title, s.grade, s.feedback, s.submitted_at,
-       s.updated_at
+       s.updated_at,
+       count(*) OVER() AS submitted,
+       COALESCE(avg(s.grade) OVER(), 0)::float8 AS average_grade
 FROM assignment_submissions s
 JOIN assignments a ON a.id = s.assignment_id
 JOIN courses c ON c.id = a.course_id
@@ -409,6 +392,8 @@ type ListStudentGradesRow struct {
 	Feedback        pgtype.Text        `json:"feedback"`
 	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	Submitted       int64              `json:"submitted"`
+	AverageGrade    float64            `json:"average_grade"`
 }
 
 func (q *Queries) ListStudentGrades(ctx context.Context, studentID pgtype.UUID) ([]ListStudentGradesRow, error) {
@@ -430,6 +415,8 @@ func (q *Queries) ListStudentGrades(ctx context.Context, studentID pgtype.UUID) 
 			&i.Feedback,
 			&i.SubmittedAt,
 			&i.UpdatedAt,
+			&i.Submitted,
+			&i.AverageGrade,
 		); err != nil {
 			return nil, err
 		}

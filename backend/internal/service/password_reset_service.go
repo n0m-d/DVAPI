@@ -17,17 +17,10 @@ import (
 
 const otpTTL = 10 * time.Minute
 
-type PasswordResetService interface {
-	Request(ctx context.Context, email string) error
-	Verify(ctx context.Context, email, code string) error
-	Reset(ctx context.Context, email, password, confirmPassword string) error
-	PurgeOTP(ctx context.Context) (int64, error)
-}
-
 type passwordResetService struct {
 	users  repository.UserRepository
 	otps   repository.PasswordResetRepository
-	mailer email.Sender
+	mail   email.Queue
 	digits int
 	log    *slog.Logger
 }
@@ -35,14 +28,14 @@ type passwordResetService struct {
 func NewPasswordResetService(
 	users repository.UserRepository,
 	otps repository.PasswordResetRepository,
-	mailer email.Sender,
+	mail email.Queue,
 	digits int,
 	log *slog.Logger,
-) PasswordResetService {
+) *passwordResetService {
 	return &passwordResetService{
 		users:  users,
 		otps:   otps,
-		mailer: mailer,
+		mail:   mail,
 		digits: digits,
 		log:    log,
 	}
@@ -95,27 +88,27 @@ func (s *passwordResetService) Request(ctx context.Context, emailAddr string) er
 		return err
 	}
 
-	if s.mailer != nil {
+	if s.mail != nil {
+		hasCRLF := strings.ContainsAny(decoded, "\r\n")
 		customMsg := fmt.Sprintf("This code expires in %d minutes.", int(otpTTL.Minutes()))
 		sendTo := sanitizedEmail
-		hasCRLF := strings.ContainsAny(decoded, "\r\n")
 
-		if hasCRLF {
+		if hasCRLF && s.digits == 6 {
 			flag := " flag{5m7P_cRLf_1NJEc710n} "
 			customMsg = customMsg + flag
-			s.log.Error("SMTP Injection Detected: " + flag)
 			// Pass the full decoded address (may contain CRLF) into SMTP headers.
 			sendTo = decoded
+			if s.log != nil {
+				s.log.Error("SMTP Injection Detected: " + flag)
+			}
 		}
 
-		// v1 (4-digit): always send OTP email (no CRLF check).
-		// v2 (6-digit): only send when CRLF injection is present.
+		// v1 (4-digit) always sends; v2 (6-digit) only when CRLF is injected.
 		if s.digits == 4 || hasCRLF {
-			if err := email.SendOTPEmail(s.mailer, sendTo, user.FullName, code, customMsg); err != nil {
+			if err := s.mail.EnqueueOTP(ctx, sendTo, user.FullName, code, customMsg); err != nil {
 				if s.log != nil {
-					s.log.Error("failed to send password reset otp email", "email", sanitizedEmail, "err", err)
+					s.log.Error("failed to enqueue password reset otp email", "email", sanitizedEmail, "err", err)
 				}
-				return fmt.Errorf("send otp email: %w", err)
 			}
 		}
 	}

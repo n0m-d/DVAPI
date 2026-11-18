@@ -1,23 +1,37 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/middleware"
-	"github.com/n0m-d/DVAPI/internal/service"
+	"github.com/n0m-d/DVAPI/internal/query"
 )
 
-type CourseHandler struct {
-	courseService service.CourseService
+// CourseService is the subset of course operations the course endpoints use.
+type CourseService interface {
+	GetByID(ctx context.Context, id string) (domain.Course, error)
+	Create(ctx context.Context, instructorID uuid.UUID, input domain.CreateCourseRequest) (domain.Course, error)
+	Update(ctx context.Context, courseID, instructorID uuid.UUID, input domain.UpdateCourseRequest) (domain.Course, error)
+	Delete(ctx context.Context, courseID, instructorID uuid.UUID) error
+	ListLessons(ctx context.Context, courseID, userID uuid.UUID, requireEnrollment bool) ([]domain.Lesson, error)
+	CreateLesson(ctx context.Context, courseID, instructorID uuid.UUID, input domain.CreateLessonRequest) (domain.Lesson, error)
+	UpdateLesson(ctx context.Context, lessonID, instructorID uuid.UUID, input domain.UpdateLessonRequest) (domain.Lesson, error)
+	DeleteLesson(ctx context.Context, lessonID, instructorID uuid.UUID) error
+	Enroll(ctx context.Context, courseID, studentID uuid.UUID) error
+	Unenroll(ctx context.Context, courseID, studentID uuid.UUID) error
 }
 
-func NewCourseHandler(courseService service.CourseService) *CourseHandler {
-	return &CourseHandler{courseService: courseService}
+type CourseHandler struct {
+	courseService CourseService
+	queries       query.Service
+}
+
+func NewCourseHandler(courseService CourseService, queries query.Service) *CourseHandler {
+	return &CourseHandler{courseService: courseService, queries: queries}
 }
 
 // GetCourses godoc
@@ -42,7 +56,7 @@ func (h *CourseHandler) GetCourses(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.courseService.GetCourses(c.Request.Context(), service.CourseListInput{
+	resp, err := h.queries.Courses(c.Request.Context(), query.CourseListInput{
 		Published: published,
 		Title:     c.Query("title"),
 		Page:      page,
@@ -70,7 +84,7 @@ func (h *CourseHandler) GetByID(c *gin.Context) {
 	id := c.Param("courseId")
 	course, err := h.courseService.GetByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Course not found", "status": "error"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, course.ToDetail())
@@ -91,15 +105,8 @@ func (h *CourseHandler) GetByID(c *gin.Context) {
 // @Failure      500  "Internal server error"
 // @Router       /enrolled-courses [get]
 func (h *CourseHandler) GetEnrolledCourses(c *gin.Context) {
-	raw, ok := c.Get(middleware.ClaimsKey)
+	claims, ok := currentClaims(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
-		return
-	}
-
-	claims, ok := raw.(*domain.Claims)
-	if !ok || claims == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
 		return
 	}
 
@@ -108,7 +115,7 @@ func (h *CourseHandler) GetEnrolledCourses(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.courseService.GetEnrolledCourses(c.Request.Context(), service.EnrolledCoursesInput{
+	resp, err := h.queries.EnrolledCourses(c.Request.Context(), query.EnrolledCoursesInput{
 		StudentID: claims.UserID,
 		Title:     c.Query("title"),
 		Page:      page,
@@ -132,19 +139,12 @@ func (h *CourseHandler) GetEnrolledCourses(c *gin.Context) {
 // @Failure      500  "Internal server error"
 // @Router       /enrolled-courses-count [get]
 func (h *CourseHandler) GetEnrolledCoursesCount(c *gin.Context) {
-	raw, ok := c.Get(middleware.ClaimsKey)
+	claims, ok := currentClaims(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
 		return
 	}
 
-	claims, ok := raw.(*domain.Claims)
-	if !ok || claims == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
-		return
-	}
-
-	resp, err := h.courseService.GetEnrolledCoursesCount(c.Request.Context(), claims.UserID)
+	resp, err := h.queries.EnrolledCoursesCount(c.Request.Context(), claims.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
 		return
@@ -179,9 +179,8 @@ func (h *CourseHandler) ListStudents(c *gin.Context) {
 		return
 	}
 
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 
@@ -190,7 +189,7 @@ func (h *CourseHandler) ListStudents(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.courseService.ListStudents(c.Request.Context(), service.ListCourseStudentsInput{
+	resp, err := h.queries.CourseStudents(c.Request.Context(), query.CourseStudentsInput{
 		CourseID:     courseID,
 		InstructorID: claims.UserID,
 		Name:         c.Query("name"),
@@ -198,14 +197,7 @@ func (h *CourseHandler) ListStudents(c *gin.Context) {
 		PageSize:     pageSize,
 	})
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Course not found", "status": "error"})
-		case errors.Is(err, service.ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "You can only view students for your own courses", "status": "error"})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
-		}
+		respondError(c, err)
 		return
 	}
 
@@ -237,7 +229,7 @@ func (h *CourseHandler) ListMyCourses(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.courseService.ListMyCourses(c.Request.Context(), service.InstructorCoursesInput{
+	resp, err := h.queries.InstructorCourses(c.Request.Context(), query.InstructorCoursesInput{
 		InstructorID: claims.UserID,
 		Title:        c.Query("title"),
 		Page:         page,
@@ -275,7 +267,7 @@ func (h *CourseHandler) Create(c *gin.Context) {
 	}
 	course, err := h.courseService.Create(c.Request.Context(), claims.UserID, input)
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"status": "success", "data": course})
@@ -302,9 +294,8 @@ func (h *CourseHandler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 	var input domain.UpdateCourseRequest
@@ -314,7 +305,7 @@ func (h *CourseHandler) Update(c *gin.Context) {
 	}
 	course, err := h.courseService.Update(c.Request.Context(), courseID, claims.UserID, input)
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": course})
@@ -338,13 +329,12 @@ func (h *CourseHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 	if err := h.courseService.Delete(c.Request.Context(), courseID, claims.UserID); err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -391,14 +381,13 @@ func (h *CourseHandler) listLessons(c *gin.Context, requireEnrollment bool) {
 	if !ok {
 		return
 	}
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 	lessons, err := h.courseService.ListLessons(c.Request.Context(), courseID, claims.UserID, requireEnrollment)
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": lessons})
@@ -425,9 +414,8 @@ func (h *CourseHandler) CreateLesson(c *gin.Context) {
 	if !ok {
 		return
 	}
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 	var input domain.CreateLessonRequest
@@ -437,7 +425,7 @@ func (h *CourseHandler) CreateLesson(c *gin.Context) {
 	}
 	lesson, err := h.courseService.CreateLesson(c.Request.Context(), courseID, claims.UserID, input)
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"status": "success", "data": lesson})
@@ -464,9 +452,8 @@ func (h *CourseHandler) UpdateLesson(c *gin.Context) {
 	if !ok {
 		return
 	}
-	lessonID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lesson id", "status": "error"})
+	lessonID, ok := pathUUID(c, "id", "lesson")
+	if !ok {
 		return
 	}
 	var input domain.UpdateLessonRequest
@@ -476,7 +463,7 @@ func (h *CourseHandler) UpdateLesson(c *gin.Context) {
 	}
 	lesson, err := h.courseService.UpdateLesson(c.Request.Context(), lessonID, claims.UserID, input)
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": lesson})
@@ -500,13 +487,12 @@ func (h *CourseHandler) DeleteLesson(c *gin.Context) {
 	if !ok {
 		return
 	}
-	lessonID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lesson id", "status": "error"})
+	lessonID, ok := pathUUID(c, "id", "lesson")
+	if !ok {
 		return
 	}
 	if err := h.courseService.DeleteLesson(c.Request.Context(), lessonID, claims.UserID); err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -552,18 +538,18 @@ func (h *CourseHandler) changeEnrollment(c *gin.Context, enroll bool) {
 	if !ok {
 		return
 	}
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
+	var err error
 	if enroll {
 		err = h.courseService.Enroll(c.Request.Context(), courseID, claims.UserID)
 	} else {
 		err = h.courseService.Unenroll(c.Request.Context(), courseID, claims.UserID)
 	}
 	if err != nil {
-		respondCourseError(c, err)
+		respondError(c, err)
 		return
 	}
 	if enroll {
@@ -571,23 +557,6 @@ func (h *CourseHandler) changeEnrollment(c *gin.Context, enroll bool) {
 		return
 	}
 	c.Status(http.StatusNoContent)
-}
-
-func respondCourseError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, service.ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "Course or lesson not found", "status": "error"})
-	case errors.Is(err, service.ErrForbidden):
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only manage your own courses", "status": "error"})
-	case errors.Is(err, service.ErrNotEnrolled):
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not enrolled in this course", "status": "error"})
-	case errors.Is(err, service.ErrAlreadyExists):
-		c.JSON(http.StatusConflict, gin.H{"error": "Already enrolled in this course", "status": "error"})
-	case errors.Is(err, service.ErrInvalidInput):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
-	}
 }
 
 func parsePagination(c *gin.Context) (page, pageSize int, ok bool) {

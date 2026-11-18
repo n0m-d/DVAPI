@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,17 +10,34 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/middleware"
 	"github.com/n0m-d/DVAPI/internal/service"
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
 
+// AssignmentService is the subset of assignment operations the assignment
+// endpoints use. CloseOverdue is deliberately absent; only the job scheduler
+// needs it, and it declares its own OverdueCloser.
+type AssignmentService interface {
+	CreateAssignment(ctx context.Context, input domain.CreateAssignmentInput, userId uuid.UUID) (domain.Assignment, error)
+	UpdateAssignment(ctx context.Context, assignmentID, instructorID uuid.UUID, input domain.UpdateAssignmentRequest) (domain.Assignment, error)
+	DeleteAssignment(ctx context.Context, assignmentID, instructorID uuid.UUID) error
+	ListPublishedByCourse(ctx context.Context, courseID, studentID uuid.UUID) ([]domain.Assignment, error)
+	ListCourseAssignments(ctx context.Context, input service.ListCourseAssignmentsInput) (domain.AssignmentListResponse, error)
+	ListSubmissions(ctx context.Context, input service.ListSubmissionsInput) (domain.SubmissionListResponse, error)
+	GetAccessibleByID(ctx context.Context, assignmentID, userID uuid.UUID, role string) (domain.Assignment, error)
+	ValidateSubmission(ctx context.Context, assignmentID, studentID uuid.UUID, submissionText string) error
+	CreateSubmission(ctx context.Context, input domain.CreateAssignmentSubmissionInput) (domain.AssignmentSubmission, error)
+	GetMySubmission(ctx context.Context, assignmentID, studentID uuid.UUID) (domain.AssignmentSubmission, error)
+	GradeSubmission(ctx context.Context, input domain.GradeSubmissionInput) (domain.AssignmentSubmission, error)
+	GetSubmissionForInstructor(ctx context.Context, submissionID, instructorID uuid.UUID) (domain.AssignmentSubmission, error)
+}
+
 type AssignmentHandler struct {
-	assignments service.AssignmentService
+	assignments AssignmentService
 	uploadDir   string
 }
 
-func NewAssignmentHandler(assignments service.AssignmentService) *AssignmentHandler {
+func NewAssignmentHandler(assignments AssignmentService) *AssignmentHandler {
 	return &AssignmentHandler{
 		assignments: assignments,
 		uploadDir:   "uploads/assignments",
@@ -47,15 +64,14 @@ func (h *AssignmentHandler) ListByCourse(c *gin.Context) {
 		return
 	}
 
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 
 	assignments, err := h.assignments.ListPublishedByCourse(c.Request.Context(), courseID, claims.UserID)
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -82,9 +98,8 @@ func (h *AssignmentHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	assignmentID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id", "status": "error"})
+	assignmentID, ok := pathUUID(c, "id", "assignment")
+	if !ok {
 		return
 	}
 
@@ -95,7 +110,7 @@ func (h *AssignmentHandler) GetByID(c *gin.Context) {
 		claims.Role,
 	)
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -135,9 +150,8 @@ func (h *AssignmentHandler) CreateSubmission(c *gin.Context) {
 		return
 	}
 
-	assignmentID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id", "status": "error"})
+	assignmentID, ok := pathUUID(c, "id", "assignment")
+	if !ok {
 		return
 	}
 
@@ -148,7 +162,7 @@ func (h *AssignmentHandler) CreateSubmission(c *gin.Context) {
 	}
 
 	if err := h.assignments.ValidateSubmission(c.Request.Context(), assignmentID, claims.UserID, input.SubmissionText); err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -167,7 +181,7 @@ func (h *AssignmentHandler) CreateSubmission(c *gin.Context) {
 	})
 	if err != nil {
 		_ = os.Remove(filePath)
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -207,7 +221,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 
 	_, err := h.assignments.CreateAssignment(c.Request.Context(), input, claims.UserID)
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -238,9 +252,8 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 	if !ok {
 		return
 	}
-	assignmentID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id", "status": "error"})
+	assignmentID, ok := pathUUID(c, "id", "assignment")
+	if !ok {
 		return
 	}
 	var input domain.UpdateAssignmentRequest
@@ -250,7 +263,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 	}
 	assignment, err := h.assignments.UpdateAssignment(c.Request.Context(), assignmentID, claims.UserID, input)
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": assignment})
@@ -274,13 +287,12 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 	if !ok {
 		return
 	}
-	assignmentID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id", "status": "error"})
+	assignmentID, ok := pathUUID(c, "id", "assignment")
+	if !ok {
 		return
 	}
 	if err := h.assignments.DeleteAssignment(c.Request.Context(), assignmentID, claims.UserID); err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -305,15 +317,14 @@ func (h *AssignmentHandler) GetMySubmission(c *gin.Context) {
 		return
 	}
 
-	assignmentID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id", "status": "error"})
+	assignmentID, ok := pathUUID(c, "id", "assignment")
+	if !ok {
 		return
 	}
 
 	submission, err := h.assignments.GetMySubmission(c.Request.Context(), assignmentID, claims.UserID)
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -343,9 +354,8 @@ func (h *AssignmentHandler) ListCourseAssignments(c *gin.Context) {
 		return
 	}
 
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return
 	}
 
@@ -362,7 +372,7 @@ func (h *AssignmentHandler) ListCourseAssignments(c *gin.Context) {
 		PageSize:     pageSize,
 	})
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -387,9 +397,8 @@ func (h *AssignmentHandler) ListCourseAssignments(c *gin.Context) {
 // @Router       /assignments/{id}/submissions [get]
 func (h *AssignmentHandler) ListSubmissions(c *gin.Context) {
 
-	assignmentID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id", "status": "error"})
+	assignmentID, ok := pathUUID(c, "id", "assignment")
+	if !ok {
 		return
 	}
 
@@ -405,7 +414,7 @@ func (h *AssignmentHandler) ListSubmissions(c *gin.Context) {
 		PageSize:     pageSize,
 	})
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -434,9 +443,8 @@ func (h *AssignmentHandler) GradeSubmission(c *gin.Context) {
 		return
 	}
 
-	submissionID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid submission id", "status": "error"})
+	submissionID, ok := pathUUID(c, "id", "submission")
+	if !ok {
 		return
 	}
 
@@ -453,7 +461,7 @@ func (h *AssignmentHandler) GradeSubmission(c *gin.Context) {
 		Feedback:     input.Feedback,
 	})
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -483,14 +491,13 @@ func (h *AssignmentHandler) GetSubmissionForInstructor(c *gin.Context) {
 	if !ok {
 		return
 	}
-	submissionID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid submission id", "status": "error"})
+	submissionID, ok := pathUUID(c, "id", "submission")
+	if !ok {
 		return
 	}
 	submission, err := h.assignments.GetSubmissionForInstructor(c.Request.Context(), submissionID, claims.UserID)
 	if err != nil {
-		respondAssignmentError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": submission})
@@ -513,20 +520,6 @@ func (h *AssignmentHandler) saveSubmissionFile(c *gin.Context, assignmentID, stu
 		return "", "", err
 	}
 	return fileName, dst, nil
-}
-
-func currentClaims(c *gin.Context) (*domain.Claims, bool) {
-	raw, ok := c.Get(middleware.ClaimsKey)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
-		return nil, false
-	}
-	claims, ok := raw.(*domain.Claims)
-	if !ok || claims == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
-		return nil, false
-	}
-	return claims, true
 }
 
 func (h *AssignmentHandler) GetFile(c *gin.Context) {
@@ -554,25 +547,4 @@ func (h *AssignmentHandler) GetFile(c *gin.Context) {
 
 	c.File(clean)
 
-}
-
-func respondAssignmentError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, service.ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "Course/assignment/submission not found", "status": "error"})
-	case errors.Is(err, service.ErrForbidden):
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only access assignments for your own courses", "status": "error"})
-	case errors.Is(err, service.ErrNotEnrolled):
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not enrolled in this course", "status": "error"})
-	case errors.Is(err, service.ErrAssignmentClosed):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Assignment is not open for submissions", "status": "error"})
-	case errors.Is(err, service.ErrPastDue):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Assignment due date has passed", "status": "error"})
-	case errors.Is(err, service.ErrAlreadyExists):
-		c.JSON(http.StatusConflict, gin.H{"error": "You have already submitted this assignment", "status": "error"})
-	case errors.Is(err, service.ErrInvalidInput):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
-	}
 }

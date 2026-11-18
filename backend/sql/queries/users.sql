@@ -48,13 +48,23 @@ RETURNING id, email, password_hash, full_name, role, created_at, updated_at;
 
 -- name: GetAdminStats :one
 SELECT
-    (SELECT count(*) FROM users)::bigint AS users,
-    (SELECT count(*) FROM users WHERE role = 'student')::bigint AS students,
-    (SELECT count(*) FROM users WHERE role = 'instructor')::bigint AS instructors,
-    (SELECT count(*) FROM courses)::bigint AS courses,
-    (SELECT count(*) FROM enrollments)::bigint AS enrollments,
-    (SELECT count(*) FROM assignments)::bigint AS assignments,
-    (SELECT count(*) FROM assignment_submissions)::bigint AS submissions;
+    u.users,
+    u.students,
+    u.instructors,
+    c.courses,
+    e.enrollments,
+    a.assignments,
+    s.submissions
+FROM
+    (SELECT
+        count(*)::bigint AS users,
+        count(*) FILTER (WHERE role = 'student')::bigint AS students,
+        count(*) FILTER (WHERE role = 'instructor')::bigint AS instructors
+     FROM users) u,
+    (SELECT count(*)::bigint AS courses FROM courses) c,
+    (SELECT count(*)::bigint AS enrollments FROM enrollments) e,
+    (SELECT count(*)::bigint AS assignments FROM assignments) a,
+    (SELECT count(*)::bigint AS submissions FROM assignment_submissions) s;
 
 -- name: ListPublishedCourses :many
 SELECT id, instructor_id, title, slug, description, published, created_at, updated_at
@@ -75,9 +85,20 @@ WHERE course_id = $1
 ORDER BY sort_order ASC;
 
 -- name: CreateEnrollment :one
-INSERT INTO enrollments (user_id, course_id)
-VALUES ($1, $2)
-RETURNING id, user_id, course_id, enrolled_at;
+WITH inserted AS (
+    INSERT INTO enrollments (user_id, course_id)
+    VALUES ($1, $2)
+    RETURNING id, user_id, course_id, enrolled_at
+)
+SELECT inserted.id, inserted.user_id, inserted.course_id, inserted.enrolled_at,
+       usr.email, usr.full_name
+FROM inserted
+JOIN users usr ON usr.id = inserted.user_id;
+
+-- name: ListEnrollmentCourseIDsByUser :many
+SELECT course_id
+FROM enrollments
+WHERE user_id = sqlc.arg(user_id);
 
 -- name: GetEnrollment :one
 SELECT id, user_id, course_id, enrolled_at

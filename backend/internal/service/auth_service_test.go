@@ -44,7 +44,7 @@ func TestRegister_NormalizesEmailAndDefaultsToStudentRole(t *testing.T) {
 		},
 	}
 
-	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{})
+	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{}, nil)
 	user, err := svc.Register(context.Background(), service.RegisterInput{
 		Email:    "  Alice@Example.COM  ",
 		Password: "password1",
@@ -77,7 +77,7 @@ func TestRegister_MapsDuplicateEmail(t *testing.T) {
 		},
 	}
 
-	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{})
+	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{}, nil)
 	_, err := svc.Register(context.Background(), service.RegisterInput{
 		Email:    "taken@example.com",
 		Password: "password1",
@@ -113,7 +113,7 @@ func TestLogin_ReturnsToken(t *testing.T) {
 	}
 
 	bl := &mockBlacklist{}
-	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, bl)
+	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, bl, nil)
 	resp, err := svc.Login(context.Background(), "alice@example.com", "password1")
 	if err != nil {
 		t.Fatalf("Login() error = %v", err)
@@ -143,7 +143,7 @@ func TestLogin_InvalidPassword(t *testing.T) {
 		},
 	}
 
-	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{})
+	svc := service.NewAuthService(repo, &config.Config{JWT_SECRET: "test-secret"}, &mockBlacklist{}, nil)
 	_, err = svc.Login(context.Background(), "alice@example.com", "wrong-password")
 	if !errors.Is(err, service.ErrInvalidCredentials) {
 		t.Fatalf("error = %v, want ErrInvalidCredentials", err)

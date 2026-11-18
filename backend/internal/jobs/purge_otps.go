@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
-	"github.com/n0m-d/DVAPI/internal/service"
 )
 
 func registerPurgeOTP(s gocron.Scheduler, deps Deps) error {
@@ -20,7 +19,7 @@ func registerPurgeOTP(s gocron.Scheduler, deps Deps) error {
 	return err
 }
 
-func purgeOTP(reset service.PasswordResetService, log *slog.Logger) {
+func purgeOTP(reset OTPPurger, log *slog.Logger) {
 	started := time.Now()
 	log.Info("job started", "job", "purge_otps")
 

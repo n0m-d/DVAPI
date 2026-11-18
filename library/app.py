@@ -1,3 +1,6 @@
+import os
+from functools import cache
+
 from flask import Flask, request, jsonify
 from lxml import etree
 
@@ -6,6 +9,7 @@ app = Flask(__name__)
 DATA_FILE = "library.xml"
 
 
+@cache
 def load_tree():
     return etree.parse(DATA_FILE)
 
@@ -111,4 +115,9 @@ def books():
     return jsonify({"found": bool(books), "books": books}), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    debug = os.getenv("FLASK_DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
+    app.run(
+        host=os.getenv("FLASK_HOST", "0.0.0.0"),
+        port=int(os.getenv("FLASK_PORT", "5000")),
+        debug=debug,
+    )

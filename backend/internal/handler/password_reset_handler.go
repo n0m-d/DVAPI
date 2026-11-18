@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,15 +13,24 @@ import (
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
 
+// PasswordResetService is the subset of reset operations the reset endpoints use.
+// PurgeOTP is deliberately absent; only the job scheduler needs it, and it
+// declares its own OTPPurger.
+type PasswordResetService interface {
+	Request(ctx context.Context, email string) error
+	Verify(ctx context.Context, email, code string) error
+	Reset(ctx context.Context, email, password, confirmPassword string) error
+}
+
 type PasswordResetHandler struct {
-	svc    service.PasswordResetService
+	svc    PasswordResetService
 	digits int
 }
 
 type PasswordResetConfig struct {
 	Users  repository.UserRepository
 	OTPs   repository.PasswordResetRepository
-	Mailer email.Sender
+	Mail   email.Queue
 	Digits int
 	Log    *slog.Logger
 }
@@ -33,7 +42,7 @@ func (c PasswordResetConfig) WithDigits(digits int) PasswordResetConfig {
 
 func NewPasswordResetHandler(cfg PasswordResetConfig) *PasswordResetHandler {
 	return &PasswordResetHandler{
-		svc:    service.NewPasswordResetService(cfg.Users, cfg.OTPs, cfg.Mailer, cfg.Digits, cfg.Log),
+		svc:    service.NewPasswordResetService(cfg.Users, cfg.OTPs, cfg.Mail, cfg.Digits, cfg.Log),
 		digits: cfg.Digits,
 	}
 }
@@ -73,7 +82,7 @@ func (h *PasswordResetHandler) Request(c *gin.Context) {
 	}
 
 	if err := h.svc.Request(c.Request.Context(), req.Email); err != nil {
-		respondPasswordResetError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -110,7 +119,7 @@ func (h *PasswordResetHandler) Verify(c *gin.Context) {
 	}
 
 	if err := h.svc.Verify(c.Request.Context(), req.Email, req.OTP); err != nil {
-		respondPasswordResetError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -140,7 +149,7 @@ func (h *PasswordResetHandler) Confirm(c *gin.Context) {
 	}
 
 	if err := h.svc.Reset(c.Request.Context(), req.Email, req.Password, req.ConfirmPassword); err != nil {
-		respondPasswordResetError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -148,19 +157,4 @@ func (h *PasswordResetHandler) Confirm(c *gin.Context) {
 		"message": "Password reset successfully",
 		"status":  "success",
 	})
-}
-
-func respondPasswordResetError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, service.ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "status": "error"})
-	case errors.Is(err, service.ErrOTPInvalid):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired OTP", "status": "error"})
-	case errors.Is(err, service.ErrOTPNotVerified):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "OTP verification required", "status": "error"})
-	case errors.Is(err, service.ErrInvalidInput):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error", "err": err.Error()})
-	}
 }

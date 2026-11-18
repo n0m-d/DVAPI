@@ -50,20 +50,8 @@ func (m *mockUserRepository) UpdatePassword(ctx context.Context, id uuid.UUID, p
 	return nil
 }
 
-func (m *mockUserRepository) List(context.Context, string, string, int, int) ([]domain.User, error) {
-	return nil, nil
-}
-
-func (m *mockUserRepository) Count(context.Context, string, string) (int, error) {
-	return 0, nil
-}
-
 func (m *mockUserRepository) Update(_ context.Context, user domain.User) (domain.User, error) {
 	return user, nil
-}
-
-func (m *mockUserRepository) GetAdminStats(context.Context) (domain.AdminStats, error) {
-	return domain.AdminStats{}, nil
 }
 
 func TestUpdateProfile_RejectsUpdatingAnotherUser(t *testing.T) {

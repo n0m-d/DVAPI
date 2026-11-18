@@ -44,7 +44,7 @@ func (m *mockAuthService) UpdatePassword(ctx context.Context, userId uuid.UUID, 
 	return nil
 }
 
-func setupAuthRouter(svc service.AuthService) *gin.Engine {
+func setupAuthRouter(svc handler.AuthService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	h := handler.NewAuthHandler(svc)

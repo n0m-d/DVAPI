@@ -31,7 +31,7 @@ func NewNoteRepository(queries *db.Queries, database db.DBTX) NoteRepository {
 
 func (r *noteRepository) Create(ctx context.Context, input domain.CreateNoteInput) (domain.Note, error) {
 	row, err := r.queries.CreateNote(ctx, db.CreateNoteParams{
-		UserID: pgUUID(input.UserID),
+		UserID: db.PgUUID(input.UserID),
 		Title:  input.Title,
 		Body:   input.Body,
 	})
@@ -76,7 +76,7 @@ func (r *noteRepository) List(ctx context.Context, userID *uuid.UUID) ([]domain.
 
 func (r *noteRepository) Update(ctx context.Context, id uuid.UUID, input domain.UpdateNoteInput) (domain.Note, error) {
 	row, err := r.queries.UpdateNote(ctx, db.UpdateNoteParams{
-		ID:    pgUUID(id),
+		ID:    db.PgUUID(id),
 		Title: optionalPgText(input.Title),
 		Body:  optionalPgText(input.Body),
 	})
@@ -90,7 +90,7 @@ func (r *noteRepository) Update(ctx context.Context, id uuid.UUID, input domain.
 }
 
 func (r *noteRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	affected, err := r.queries.DeleteNote(ctx, pgUUID(id))
+	affected, err := r.queries.DeleteNote(ctx, db.PgUUID(id))
 	if err != nil {
 		return err
 	}
@@ -108,11 +108,11 @@ func optionalPgText(v *string) pgtype.Text {
 }
 
 func toDomainNote(row db.Note) (domain.Note, error) {
-	id, err := fromPgUUID(row.ID)
+	id, err := db.FromPgUUID(row.ID)
 	if err != nil {
 		return domain.Note{}, fmt.Errorf("note id: %w", err)
 	}
-	userID, err := fromPgUUID(row.UserID)
+	userID, err := db.FromPgUUID(row.UserID)
 	if err != nil {
 		return domain.Note{}, fmt.Errorf("note user id: %w", err)
 	}

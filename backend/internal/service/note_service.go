@@ -11,19 +11,11 @@ import (
 	"github.com/n0m-d/DVAPI/internal/repository"
 )
 
-type NoteService interface {
-	Create(ctx context.Context, input domain.CreateNoteInput) (domain.Note, error)
-	GetByID(ctx context.Context, id string) (domain.Note, error)
-	List(ctx context.Context, userID *uuid.UUID) ([]domain.Note, error) //*uuid.UUID (a pointer) instead of uuid.UUID (a value) is the idiomatic Go way to make a parameter optional
-	Update(ctx context.Context, id uuid.UUID, input domain.UpdateNoteInput) (domain.Note, error)
-	Delete(ctx context.Context, id uuid.UUID) error
-}
-
 type noteService struct {
 	notes repository.NoteRepository
 }
 
-func NewNoteService(notes repository.NoteRepository) NoteService {
+func NewNoteService(notes repository.NoteRepository) *noteService {
 	return &noteService{notes: notes}
 }
 

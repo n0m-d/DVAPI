@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/n0m-d/DVAPI/internal/db"
 	"github.com/n0m-d/DVAPI/internal/domain"
 )
@@ -20,10 +19,7 @@ type UserRepository interface {
 	GetByEmailWithPassword(ctx context.Context, email string) (domain.UserWithPassword, error)
 	Create(ctx context.Context, input domain.CreateUserInput) (domain.User, error)
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
-	List(ctx context.Context, search, role string, limit, offset int) ([]domain.User, error)
-	Count(ctx context.Context, search, role string) (int, error)
 	Update(ctx context.Context, user domain.User) (domain.User, error)
-	GetAdminStats(ctx context.Context) (domain.AdminStats, error)
 }
 
 type userRepository struct {
@@ -35,7 +31,7 @@ func NewUserRepository(queries *db.Queries) UserRepository {
 }
 
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
-	user, err := r.queries.GetUserByID(ctx, pgUUID(id))
+	user, err := r.queries.GetUserByID(ctx, db.PgUUID(id))
 	if err != nil {
 		return domain.User{}, mapError(err)
 	}
@@ -43,7 +39,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.User
 }
 
 func (r *userRepository) GetByIDWithPassword(ctx context.Context, id uuid.UUID) (domain.UserWithPassword, error) {
-	user, err := r.queries.GetUserByID(ctx, pgUUID(id))
+	user, err := r.queries.GetUserByID(ctx, db.PgUUID(id))
 	if err != nil {
 		return domain.UserWithPassword{}, mapError(err)
 	}
@@ -82,42 +78,15 @@ func (r *userRepository) Create(ctx context.Context, input domain.CreateUserInpu
 
 func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
 	err := r.queries.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
-		ID:           pgUUID(id),
+		ID:           db.PgUUID(id),
 		PasswordHash: passwordHash,
 	})
 	return mapError(err)
 }
 
-func (r *userRepository) List(ctx context.Context, search, role string, limit, offset int) ([]domain.User, error) {
-	rows, err := r.queries.ListUsers(ctx, db.ListUsersParams{
-		Search:      search,
-		Role:        role,
-		LimitCount:  int32(limit),
-		OffsetCount: int32(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	users := make([]domain.User, 0, len(rows))
-	for _, row := range rows {
-		user, err := toDomainUser(row)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, user)
-	}
-	return users, nil
-}
-
-func (r *userRepository) Count(ctx context.Context, search, role string) (int, error) {
-	total, err := r.queries.CountUsers(ctx, db.CountUsersParams{Search: search, Role: role})
-	return int(total), err
-}
-
 func (r *userRepository) Update(ctx context.Context, user domain.User) (domain.User, error) {
 	row, err := r.queries.UpdateUser(ctx, db.UpdateUserParams{
-		ID:       pgUUID(user.ID),
+		ID:       db.PgUUID(user.ID),
 		Email:    user.Email,
 		FullName: user.FullName,
 		Role:     user.Role,
@@ -128,24 +97,8 @@ func (r *userRepository) Update(ctx context.Context, user domain.User) (domain.U
 	return toDomainUser(row)
 }
 
-func (r *userRepository) GetAdminStats(ctx context.Context) (domain.AdminStats, error) {
-	row, err := r.queries.GetAdminStats(ctx)
-	if err != nil {
-		return domain.AdminStats{}, err
-	}
-	return domain.AdminStats{
-		Users:       int(row.Users),
-		Students:    int(row.Students),
-		Instructors: int(row.Instructors),
-		Courses:     int(row.Courses),
-		Enrollments: int(row.Enrollments),
-		Assignments: int(row.Assignments),
-		Submissions: int(row.Submissions),
-	}, nil
-}
-
 func toDomainUser(user db.User) (domain.User, error) {
-	id, err := fromPgUUID(user.ID)
+	id, err := db.FromPgUUID(user.ID)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("parse user id: %w", err)
 	}
@@ -169,18 +122,6 @@ func toDomainUserWithPassword(dbUser db.User) (domain.UserWithPassword, error) {
 		User:         domainUser,
 		PasswordHash: dbUser.PasswordHash,
 	}, nil
-}
-
-func pgUUID(id uuid.UUID) pgtype.UUID {
-
-	return pgtype.UUID{Bytes: id, Valid: true}
-}
-
-func fromPgUUID(id pgtype.UUID) (uuid.UUID, error) {
-	if !id.Valid {
-		return uuid.Nil, fmt.Errorf("invalid uuid")
-	}
-	return uuid.FromBytes(id.Bytes[:])
 }
 
 func mapError(err error) error {

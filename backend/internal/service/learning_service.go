@@ -21,22 +21,6 @@ type ResubmitInput struct {
 	FileName       string
 }
 
-type LearningService interface {
-	SetLessonProgress(ctx context.Context, lessonID, studentID uuid.UUID, completed bool) error
-	GetCourseProgress(ctx context.Context, courseID, studentID uuid.UUID) (domain.CourseProgress, error)
-	GetNextLesson(ctx context.Context, courseID, studentID uuid.UUID) (domain.Lesson, error)
-	GetGrades(ctx context.Context, studentID uuid.UUID) (domain.StudentGradesDashboard, error)
-	Resubmit(ctx context.Context, input ResubmitInput) (domain.AssignmentSubmission, error)
-	ListSubmissionVersions(ctx context.Context, submissionID uuid.UUID) ([]domain.SubmissionVersion, error)
-	CreateAnnouncement(ctx context.Context, courseID, instructorID uuid.UUID, input domain.CreateAnnouncementRequest) (domain.Announcement, error)
-	ListAnnouncements(ctx context.Context, courseID, userID uuid.UUID, instructor bool) ([]domain.Announcement, error)
-	UpdateAnnouncement(ctx context.Context, id, instructorID uuid.UUID, input domain.UpdateAnnouncementRequest) (domain.Announcement, error)
-	DeleteAnnouncement(ctx context.Context, id, instructorID uuid.UUID) error
-	GetCourseAnalytics(ctx context.Context, courseID, instructorID uuid.UUID) (domain.CourseAnalytics, error)
-	GetInstructorStats(ctx context.Context, instructorID uuid.UUID) (domain.InstructorStats, error)
-	GetStudentStats(ctx context.Context, studentID uuid.UUID) (domain.StudentStats, error)
-}
-
 type learningService struct {
 	learning      repository.LearningRepository
 	courses       repository.CourseRepository
@@ -51,7 +35,7 @@ func NewLearningService(
 	assignments repository.AssignmentRepository,
 	notifications repository.NotificationRepository,
 	notifier pubsub.Notifier,
-) LearningService {
+) *learningService {
 	return &learningService{
 		learning:      learning,
 		courses:       courses,
@@ -72,13 +56,6 @@ func (s *learningService) SetLessonProgress(ctx context.Context, lessonID, stude
 	return s.learning.SetLessonProgress(ctx, studentID, lessonID, completed)
 }
 
-func (s *learningService) GetCourseProgress(ctx context.Context, courseID, studentID uuid.UUID) (domain.CourseProgress, error) {
-	if err := s.requireEnrollment(ctx, studentID, courseID); err != nil {
-		return domain.CourseProgress{}, err
-	}
-	return s.learning.GetCourseProgress(ctx, studentID, courseID)
-}
-
 func (s *learningService) GetNextLesson(ctx context.Context, courseID, studentID uuid.UUID) (domain.Lesson, error) {
 	if err := s.requireEnrollment(ctx, studentID, courseID); err != nil {
 		return domain.Lesson{}, err
@@ -88,10 +65,6 @@ func (s *learningService) GetNextLesson(ctx context.Context, courseID, studentID
 		return domain.Lesson{}, mapLearningError(err)
 	}
 	return lesson, nil
-}
-
-func (s *learningService) GetGrades(ctx context.Context, studentID uuid.UUID) (domain.StudentGradesDashboard, error) {
-	return s.learning.GetStudentGrades(ctx, studentID)
 }
 
 func (s *learningService) Resubmit(ctx context.Context, input ResubmitInput) (domain.AssignmentSubmission, error) {
@@ -207,27 +180,6 @@ func (s *learningService) DeleteAnnouncement(ctx context.Context, id, instructor
 	// 	return err
 	// }
 	return mapLearningError(s.learning.DeleteAnnouncement(ctx, announcement.ID))
-}
-
-func (s *learningService) GetCourseAnalytics(ctx context.Context, courseID, instructorID uuid.UUID) (domain.CourseAnalytics, error) {
-	if _, err := s.requireOwnedCourse(ctx, courseID, instructorID); err != nil {
-		return domain.CourseAnalytics{}, err
-	}
-	return s.learning.GetCourseAnalytics(ctx, courseID)
-}
-
-func (s *learningService) GetInstructorStats(ctx context.Context, instructorID uuid.UUID) (domain.InstructorStats, error) {
-	if instructorID == uuid.Nil {
-		return domain.InstructorStats{}, fmt.Errorf("%w: instructor id is required", ErrInvalidInput)
-	}
-	return s.learning.GetInstructorStats(ctx, instructorID)
-}
-
-func (s *learningService) GetStudentStats(ctx context.Context, studentID uuid.UUID) (domain.StudentStats, error) {
-	if studentID == uuid.Nil {
-		return domain.StudentStats{}, fmt.Errorf("%w: student id is required", ErrInvalidInput)
-	}
-	return s.learning.GetStudentStats(ctx, studentID)
 }
 
 func (s *learningService) notifyAnnouncement(ctx context.Context, announcement domain.Announcement) {

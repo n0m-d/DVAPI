@@ -1,26 +1,12 @@
 package v2
 
 import (
-	"encoding/json"
-	"io"
-	"mime"
-	"net/http"
-	"time"
-
-	"github.com/99designs/gqlgen/graphql/handler/extension"
-	"github.com/99designs/gqlgen/graphql/handler/lru"
-	"github.com/99designs/gqlgen/graphql/handler/transport"
-	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/n0m-d/DVAPI/graph"
 	"github.com/n0m-d/DVAPI/internal/cache"
 	"github.com/n0m-d/DVAPI/internal/handler"
 	"github.com/n0m-d/DVAPI/internal/middleware"
-	"github.com/n0m-d/DVAPI/internal/service"
-	"github.com/vektah/gqlparser/v2/ast"
-
-	ghandler "github.com/99designs/gqlgen/graphql/handler"
 )
 
 type Config struct {
@@ -34,9 +20,9 @@ type Config struct {
 	Assignments    *handler.AssignmentHandler
 	Learning       *handler.LearningHandler
 	Notifications  *handler.NotificationHandler
-	Notes          service.NoteService
+	Notes          graph.NoteService
 	RateLimiter    *redis_rate.Limiter
-	UserService    service.UserService
+	UserService    graph.UserLister
 }
 
 func Register(r *gin.RouterGroup, cfg Config) {
@@ -135,78 +121,4 @@ func Register(r *gin.RouterGroup, cfg Config) {
 	r.GET("/library", fetchURL)
 
 	registerGraphQL(r, cfg.Notes, cfg.UserService)
-}
-
-func registerGraphQL(r *gin.RouterGroup, notes service.NoteService, userService service.UserService) {
-	srv := ghandler.New(graph.NewExecutableSchema(graph.Config{
-		Resolvers: &graph.Resolver{NoteService: notes, UserService: userService},
-	}))
-
-	srv.AddTransport(transport.Options{})
-	srv.AddTransport(transport.GET{})
-	srv.AddTransport(transport.POST{})
-
-	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-
-	srv.Use(extension.Introspection{}) //Vuln: Introspection Enabled
-	srv.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New[string](100),
-	})
-
-	r.GET("/playground", graphqlPlayground)
-	r.Any("/query", graphqlQueryHandler(srv))
-}
-
-func graphqlPlayground(c *gin.Context) {
-	playground.Handler("GraphQL Playground", "/api/v2/query").ServeHTTP(c.Writer, c.Request)
-}
-
-func graphqlQueryHandler(srv *ghandler.Server) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// gqlgen POST transport only accepts application/json.
-		// Many clients (curl, some REST UIs) omit Content-Type.
-		if c.Request.Method == http.MethodPost {
-			mediaType, _, err := mime.ParseMediaType(c.GetHeader("Content-Type"))
-			if err != nil || mediaType == "" || mediaType == "text/plain" {
-				c.Request.Header.Set("Content-Type", "application/json")
-			}
-		}
-		srv.ServeHTTP(c.Writer, c.Request)
-	}
-}
-
-func fetchURL(c *gin.Context) {
-	url := c.Query("url")
-	if url == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "empty url"})
-		return
-	}
-
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
-	resp, err := client.Get(url)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	var data any
-	if json.Unmarshal(body, &data) != nil {
-		data = string(body)
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"url":  url,
-		"data": data,
-	})
-
 }

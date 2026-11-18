@@ -56,19 +56,31 @@ WHERE c.instructor_id = sqlc.arg(instructor_id)
   AND lower(c.title) LIKE '%' || lower(sqlc.arg(title)) || '%';
 
 -- name: CreateCourse :one
-INSERT INTO courses (instructor_id, title, slug, description, published)
-VALUES (sqlc.arg(instructor_id), sqlc.arg(title), sqlc.arg(slug), sqlc.arg(description), sqlc.arg(published))
-RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at;
+WITH inserted AS (
+    INSERT INTO courses (instructor_id, title, slug, description, published)
+    VALUES (sqlc.arg(instructor_id), sqlc.arg(title), sqlc.arg(slug), sqlc.arg(description), sqlc.arg(published))
+    RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at
+)
+SELECT c.id, c.instructor_id, c.title, c.slug, c.description, c.published, c.created_at, c.updated_at,
+       u.full_name AS instructor_name, u.email AS email
+FROM inserted c
+JOIN users u ON c.instructor_id = u.id;
 
 -- name: UpdateCourse :one
-UPDATE courses
-SET title = sqlc.arg(title),
-    slug = sqlc.arg(slug),
-    description = sqlc.arg(description),
-    published = sqlc.arg(published),
-    updated_at = now()
-WHERE id = sqlc.arg(id)
-RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at;
+WITH updated AS (
+    UPDATE courses
+    SET title = sqlc.arg(title),
+        slug = sqlc.arg(slug),
+        description = sqlc.arg(description),
+        published = sqlc.arg(published),
+        updated_at = now()
+    WHERE courses.id = sqlc.arg(id)
+    RETURNING id, instructor_id, title, slug, description, published, created_at, updated_at
+)
+SELECT c.id, c.instructor_id, c.title, c.slug, c.description, c.published, c.created_at, c.updated_at,
+       u.full_name AS instructor_name, u.email AS email
+FROM updated c
+JOIN users u ON c.instructor_id = u.id;
 
 -- name: DeleteCourse :execrows
 DELETE FROM courses WHERE id = sqlc.arg(id);

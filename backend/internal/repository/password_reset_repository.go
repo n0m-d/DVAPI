@@ -30,7 +30,7 @@ func NewPasswordResetRepository(queries *db.Queries) PasswordResetRepository {
 
 func (r *passwordResetRepository) Create(ctx context.Context, input domain.CreatePasswordResetOTPInput) (domain.PasswordResetOTP, error) {
 	row, err := r.queries.CreatePasswordResetOTP(ctx, db.CreatePasswordResetOTPParams{
-		UserID:    pgUUID(input.UserID),
+		UserID:    db.PgUUID(input.UserID),
 		Email:     input.Email,
 		CodeHash:  input.CodeHash,
 		Digits:    int32(input.Digits),
@@ -59,11 +59,11 @@ func (r *passwordResetRepository) GetLatestVerifiedByEmail(ctx context.Context, 
 }
 
 func (r *passwordResetRepository) MarkVerified(ctx context.Context, id uuid.UUID) error {
-	return mapError(r.queries.MarkOTPVerified(ctx, pgUUID(id)))
+	return mapError(r.queries.MarkOTPVerified(ctx, db.PgUUID(id)))
 }
 
 func (r *passwordResetRepository) MarkUsed(ctx context.Context, id uuid.UUID) error {
-	return mapError(r.queries.MarkOTPUsed(ctx, pgUUID(id)))
+	return mapError(r.queries.MarkOTPUsed(ctx, db.PgUUID(id)))
 }
 
 func (r *passwordResetRepository) InvalidateByEmail(ctx context.Context, email string) error {
@@ -71,11 +71,11 @@ func (r *passwordResetRepository) InvalidateByEmail(ctx context.Context, email s
 }
 
 func toDomainOTP(row db.PasswordResetOtp) (domain.PasswordResetOTP, error) {
-	id, err := fromPgUUID(row.ID)
+	id, err := db.FromPgUUID(row.ID)
 	if err != nil {
 		return domain.PasswordResetOTP{}, fmt.Errorf("parse otp id: %w", err)
 	}
-	userID, err := fromPgUUID(row.UserID)
+	userID, err := db.FromPgUUID(row.UserID)
 	if err != nil {
 		return domain.PasswordResetOTP{}, fmt.Errorf("parse user id: %w", err)
 	}

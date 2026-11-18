@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,16 +10,30 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
+	"github.com/n0m-d/DVAPI/internal/query"
 	"github.com/n0m-d/DVAPI/internal/service"
 )
 
+// LearningService is the subset of learning operations the learning endpoints use.
+type LearningService interface {
+	SetLessonProgress(ctx context.Context, lessonID, studentID uuid.UUID, completed bool) error
+	GetNextLesson(ctx context.Context, courseID, studentID uuid.UUID) (domain.Lesson, error)
+	Resubmit(ctx context.Context, input service.ResubmitInput) (domain.AssignmentSubmission, error)
+	ListSubmissionVersions(ctx context.Context, submissionID uuid.UUID) ([]domain.SubmissionVersion, error)
+	CreateAnnouncement(ctx context.Context, courseID, instructorID uuid.UUID, input domain.CreateAnnouncementRequest) (domain.Announcement, error)
+	ListAnnouncements(ctx context.Context, courseID, userID uuid.UUID, instructor bool) ([]domain.Announcement, error)
+	UpdateAnnouncement(ctx context.Context, id, instructorID uuid.UUID, input domain.UpdateAnnouncementRequest) (domain.Announcement, error)
+	DeleteAnnouncement(ctx context.Context, id, instructorID uuid.UUID) error
+}
+
 type LearningHandler struct {
-	learning  service.LearningService
+	learning  LearningService
+	queries   query.Service
 	uploadDir string
 }
 
-func NewLearningHandler(learning service.LearningService) *LearningHandler {
-	return &LearningHandler{learning: learning, uploadDir: "uploads/assignments"}
+func NewLearningHandler(learning LearningService, queries query.Service) *LearningHandler {
+	return &LearningHandler{learning: learning, queries: queries, uploadDir: "uploads/assignments"}
 }
 
 // SetLessonProgress godoc
@@ -43,9 +57,8 @@ func (h *LearningHandler) SetLessonProgress(c *gin.Context) {
 	if !ok {
 		return
 	}
-	lessonID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lesson id", "status": "error"})
+	lessonID, ok := pathUUID(c, "id", "lesson")
+	if !ok {
 		return
 	}
 	var input domain.LessonProgressRequest
@@ -54,7 +67,7 @@ func (h *LearningHandler) SetLessonProgress(c *gin.Context) {
 		return
 	}
 	if err := h.learning.SetLessonProgress(c.Request.Context(), lessonID, claims.UserID, input.Completed); err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Lesson progress updated"})
@@ -79,9 +92,9 @@ func (h *LearningHandler) GetCourseProgress(c *gin.Context) {
 	if !ok {
 		return
 	}
-	progress, err := h.learning.GetCourseProgress(c.Request.Context(), courseID, claims.UserID)
+	progress, err := h.queries.CourseProgress(c.Request.Context(), courseID, claims.UserID)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": progress})
@@ -108,7 +121,7 @@ func (h *LearningHandler) GetNextLesson(c *gin.Context) {
 	}
 	lesson, err := h.learning.GetNextLesson(c.Request.Context(), courseID, claims.UserID)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": lesson})
@@ -129,9 +142,9 @@ func (h *LearningHandler) GetGrades(c *gin.Context) {
 	if !ok {
 		return
 	}
-	grades, err := h.learning.GetGrades(c.Request.Context(), claims.UserID)
+	grades, err := h.queries.StudentGrades(c.Request.Context(), claims.UserID)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": grades})
@@ -159,9 +172,8 @@ func (h *LearningHandler) Resubmit(c *gin.Context) {
 	if !ok {
 		return
 	}
-	submissionID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid submission id", "status": "error"})
+	submissionID, ok := pathUUID(c, "id", "submission")
+	if !ok {
 		return
 	}
 	var input domain.AssignmentSubmissionRequest
@@ -180,7 +192,7 @@ func (h *LearningHandler) Resubmit(c *gin.Context) {
 	})
 	if err != nil {
 		_ = os.Remove(filePath)
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": submission})
@@ -200,14 +212,13 @@ func (h *LearningHandler) Resubmit(c *gin.Context) {
 // @Failure      500  "Internal server error"
 // @Router       /submissions/{id}/versions [get]
 func (h *LearningHandler) ListSubmissionVersions(c *gin.Context) {
-	submissionID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid submission id", "status": "error"})
+	submissionID, ok := pathUUID(c, "id", "submission")
+	if !ok {
 		return
 	}
 	versions, err := h.learning.ListSubmissionVersions(c.Request.Context(), submissionID)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": versions})
@@ -241,7 +252,7 @@ func (h *LearningHandler) CreateAnnouncement(c *gin.Context) {
 	}
 	announcement, err := h.learning.CreateAnnouncement(c.Request.Context(), courseID, claims.UserID, input)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"status": "success", "data": announcement})
@@ -290,7 +301,7 @@ func (h *LearningHandler) listAnnouncements(c *gin.Context, instructor bool) {
 	}
 	announcements, err := h.learning.ListAnnouncements(c.Request.Context(), courseID, claims.UserID, instructor)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": announcements})
@@ -317,9 +328,8 @@ func (h *LearningHandler) UpdateAnnouncement(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid announcement id", "status": "error"})
+	id, ok := pathUUID(c, "id", "announcement")
+	if !ok {
 		return
 	}
 	var input domain.UpdateAnnouncementRequest
@@ -329,7 +339,7 @@ func (h *LearningHandler) UpdateAnnouncement(c *gin.Context) {
 	}
 	announcement, err := h.learning.UpdateAnnouncement(c.Request.Context(), id, claims.UserID, input)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": announcement})
@@ -353,13 +363,12 @@ func (h *LearningHandler) DeleteAnnouncement(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid announcement id", "status": "error"})
+	id, ok := pathUUID(c, "id", "announcement")
+	if !ok {
 		return
 	}
 	if err := h.learning.DeleteAnnouncement(c.Request.Context(), id, claims.UserID); err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -384,9 +393,9 @@ func (h *LearningHandler) GetCourseAnalytics(c *gin.Context) {
 	if !ok {
 		return
 	}
-	analytics, err := h.learning.GetCourseAnalytics(c.Request.Context(), courseID, claims.UserID)
+	analytics, err := h.queries.CourseAnalytics(c.Request.Context(), courseID, claims.UserID)
 	if err != nil {
-		respondLearningError(c, err)
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": analytics})
@@ -411,16 +420,16 @@ func (h *LearningHandler) GetStats(c *gin.Context) {
 
 	switch claims.Role {
 	case "instructor":
-		stats, err := h.learning.GetInstructorStats(c.Request.Context(), claims.UserID)
+		stats, err := h.queries.InstructorStats(c.Request.Context(), claims.UserID)
 		if err != nil {
-			respondLearningError(c, err)
+			respondError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "success", "role": "instructor", "data": stats})
 	case "student":
-		stats, err := h.learning.GetStudentStats(c.Request.Context(), claims.UserID)
+		stats, err := h.queries.StudentStats(c.Request.Context(), claims.UserID)
 		if err != nil {
-			respondLearningError(c, err)
+			respondError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "success", "role": "student", "data": stats})
@@ -451,27 +460,9 @@ func claimsAndCourseID(c *gin.Context) (*domain.Claims, uuid.UUID, bool) {
 	if !ok {
 		return nil, uuid.Nil, false
 	}
-	courseID, err := uuid.Parse(c.Param("courseId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course id", "status": "error"})
+	courseID, ok := pathUUID(c, "courseId", "course")
+	if !ok {
 		return nil, uuid.Nil, false
 	}
 	return claims, courseID, true
-}
-
-func respondLearningError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, service.ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "Resource not found", "status": "error"})
-	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrNotEnrolled):
-		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden", "status": "error"})
-	case errors.Is(err, service.ErrAssignmentClosed), errors.Is(err, service.ErrPastDue):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-	case errors.Is(err, service.ErrAlreadyExists):
-		c.JSON(http.StatusConflict, gin.H{"error": "Already exists", "status": "error"})
-	case errors.Is(err, service.ErrInvalidInput):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "error"})
-	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
-	}
 }

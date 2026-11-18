@@ -13,22 +13,12 @@ import (
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
 
-type UserService interface {
-	GetByID(ctx context.Context, id uuid.UUID) (domain.User, error)
-	UpdateProfile(ctx context.Context, id, actorID uuid.UUID, input domain.UpdateUserRequest) (domain.User, error)
-	UpdateProfileV1(ctx context.Context, id, actorID uuid.UUID, input domain.User) (domain.User, error)
-	AdminCreate(ctx context.Context, input domain.AdminCreateUserRequest) (domain.User, error)
-	AdminList(ctx context.Context, search, role string, page, pageSize int) (domain.AdminUserListResponse, error)
-	AdminUpdate(ctx context.Context, id, actorID uuid.UUID, input domain.AdminUpdateUserRequest) (domain.User, error)
-	AdminStats(ctx context.Context) (domain.AdminStats, error)
-}
-
 type userService struct {
 	userRepo repository.UserRepository
 	cache    cache.UserCache
 }
 
-func NewUserService(userRepo repository.UserRepository, userCache cache.UserCache) UserService {
+func NewUserService(userRepo repository.UserRepository, userCache cache.UserCache) *userService {
 	return &userService{userRepo: userRepo, cache: userCache}
 }
 
@@ -162,32 +152,6 @@ func (s *userService) AdminCreate(ctx context.Context, input domain.AdminCreateU
 	return user, nil
 }
 
-func (s *userService) AdminList(ctx context.Context, search, role string, page, pageSize int) (domain.AdminUserListResponse, error) {
-	search = strings.TrimSpace(search)
-	role = strings.TrimSpace(role)
-	if role != "" && !validUserRole(role) {
-		return domain.AdminUserListResponse{}, fmt.Errorf("%w: invalid role", ErrInvalidInput)
-	}
-
-	page, pageSize = normalizePagination(page, pageSize)
-	users, err := s.userRepo.List(ctx, search, role, pageSize, (page-1)*pageSize)
-	if err != nil {
-		return domain.AdminUserListResponse{}, fmt.Errorf("list users: %w", err)
-	}
-	total, err := s.userRepo.Count(ctx, search, role)
-	if err != nil {
-		return domain.AdminUserListResponse{}, fmt.Errorf("count users: %w", err)
-	}
-	pagination := domain.NewPagination(total, page, pageSize)
-	return domain.AdminUserListResponse{
-		Status: "success",
-		Data: &domain.AdminUserListData{
-			Users:      users,
-			Pagination: &pagination,
-		},
-	}, nil
-}
-
 func (s *userService) AdminUpdate(ctx context.Context, id, actorID uuid.UUID, input domain.AdminUpdateUserRequest) (domain.User, error) {
 	if id == uuid.Nil {
 		return domain.User{}, fmt.Errorf("%w: invalid user id", ErrInvalidInput)
@@ -233,10 +197,6 @@ func (s *userService) AdminUpdate(ctx context.Context, id, actorID uuid.UUID, in
 		_ = s.cache.DeleteUser(ctx, id)
 	}
 	return updated, nil
-}
-
-func (s *userService) AdminStats(ctx context.Context) (domain.AdminStats, error) {
-	return s.userRepo.GetAdminStats(ctx)
 }
 
 func validUserRole(role string) bool {

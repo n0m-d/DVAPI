@@ -73,12 +73,12 @@ func NewAssignmentRepository(queries *db.Queries) AssignmentRepository {
 
 func (r *assignmentRepository) Create(ctx context.Context, input CreateAssignmentInput) (domain.Assignment, error) {
 	row, err := r.queries.CreateAssignment(ctx, db.CreateAssignmentParams{
-		CourseID:    pgUUID(input.CourseID),
+		CourseID:    db.PgUUID(input.CourseID),
 		Title:       input.Title,
 		Description: pgtype.Text{String: input.Description, Valid: input.Description != ""},
 		DueDate:     pgtype.Timestamptz{Time: input.DueDate, Valid: true},
 		Status:      db.Status(input.Status),
-		CreatedBy:   pgUUID(input.CreatedBy),
+		CreatedBy:   db.PgUUID(input.CreatedBy),
 	})
 	if err != nil {
 		return domain.Assignment{}, mapAssignmentError(err)
@@ -88,7 +88,7 @@ func (r *assignmentRepository) Create(ctx context.Context, input CreateAssignmen
 
 func (r *assignmentRepository) Update(ctx context.Context, assignment domain.Assignment) (domain.Assignment, error) {
 	row, err := r.queries.UpdateAssignment(ctx, db.UpdateAssignmentParams{
-		ID:          pgUUID(assignment.ID),
+		ID:          db.PgUUID(assignment.ID),
 		Title:       assignment.Title,
 		Description: pgtype.Text{String: assignment.Description, Valid: assignment.Description != ""},
 		DueDate:     pgtype.Timestamptz{Time: assignment.DueDate, Valid: true},
@@ -101,7 +101,7 @@ func (r *assignmentRepository) Update(ctx context.Context, assignment domain.Ass
 }
 
 func (r *assignmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	affected, err := r.queries.DeleteAssignment(ctx, pgUUID(id))
+	affected, err := r.queries.DeleteAssignment(ctx, db.PgUUID(id))
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (r *assignmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *assignmentRepository) GetByID(ctx context.Context, id uuid.UUID) (domain.Assignment, error) {
-	row, err := r.queries.GetAssignmentByID(ctx, pgUUID(id))
+	row, err := r.queries.GetAssignmentByID(ctx, db.PgUUID(id))
 	if err != nil {
 		return domain.Assignment{}, mapAssignmentError(err)
 	}
@@ -121,7 +121,7 @@ func (r *assignmentRepository) GetByID(ctx context.Context, id uuid.UUID) (domai
 
 func (r *assignmentRepository) GetByCourseAndTitle(ctx context.Context, courseID uuid.UUID, title string) (domain.Assignment, error) {
 	row, err := r.queries.GetAssignmentByCourseAndTitle(ctx, db.GetAssignmentByCourseAndTitleParams{
-		CourseID: pgUUID(courseID),
+		CourseID: db.PgUUID(courseID),
 		Title:    title,
 	})
 	if err != nil {
@@ -131,7 +131,7 @@ func (r *assignmentRepository) GetByCourseAndTitle(ctx context.Context, courseID
 }
 
 func (r *assignmentRepository) ListPublishedByCourse(ctx context.Context, courseID uuid.UUID) ([]domain.Assignment, error) {
-	rows, err := r.queries.ListPublishedAssignmentsByCourse(ctx, pgUUID(courseID))
+	rows, err := r.queries.ListPublishedAssignmentsByCourse(ctx, db.PgUUID(courseID))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (r *assignmentRepository) ListPublishedByCourse(ctx context.Context, course
 
 func (r *assignmentRepository) ListByCourse(ctx context.Context, params ListAssignmentsByCourseParams) ([]domain.Assignment, error) {
 	rows, err := r.queries.ListAssignmentsByCourse(ctx, db.ListAssignmentsByCourseParams{
-		CourseID:    pgUUID(params.CourseID),
+		CourseID:    db.PgUUID(params.CourseID),
 		Title:       params.Title,
 		LimitCount:  int32(params.Limit),
 		OffsetCount: int32(params.Offset),
@@ -169,7 +169,7 @@ func (r *assignmentRepository) ListByCourse(ctx context.Context, params ListAssi
 
 func (r *assignmentRepository) CountByCourse(ctx context.Context, courseID uuid.UUID, title string) (int, error) {
 	total, err := r.queries.CountAssignmentsByCourse(ctx, db.CountAssignmentsByCourseParams{
-		CourseID: pgUUID(courseID),
+		CourseID: db.PgUUID(courseID),
 		Title:    title,
 	})
 	if err != nil {
@@ -180,8 +180,8 @@ func (r *assignmentRepository) CountByCourse(ctx context.Context, courseID uuid.
 
 func (r *assignmentRepository) CreateSubmission(ctx context.Context, input domain.CreateAssignmentSubmissionInput) (domain.AssignmentSubmission, error) {
 	row, err := r.queries.CreateAssignmentSubmission(ctx, db.CreateAssignmentSubmissionParams{
-		AssignmentID:   pgUUID(input.AssignmentID),
-		StudentID:      pgUUID(input.StudentID),
+		AssignmentID:   db.PgUUID(input.AssignmentID),
+		StudentID:      db.PgUUID(input.StudentID),
 		SubmissionText: pgtype.Text{String: input.SubmissionText, Valid: true},
 		FilePath:       pgtype.Text{String: input.FilePath, Valid: input.FilePath != ""},
 		FileName:       pgtype.Text{String: input.FileName, Valid: input.FileName != ""},
@@ -206,8 +206,8 @@ func (r *assignmentRepository) CreateSubmission(ctx context.Context, input domai
 
 func (r *assignmentRepository) GetSubmission(ctx context.Context, assignmentID, studentID uuid.UUID) (domain.AssignmentSubmission, error) {
 	row, err := r.queries.GetSubmissionByAssignmentAndStudent(ctx, db.GetSubmissionByAssignmentAndStudentParams{
-		AssignmentID: pgUUID(assignmentID),
-		StudentID:    pgUUID(studentID),
+		AssignmentID: db.PgUUID(assignmentID),
+		StudentID:    db.PgUUID(studentID),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -231,7 +231,7 @@ func (r *assignmentRepository) GetSubmission(ctx context.Context, assignmentID, 
 }
 
 func (r *assignmentRepository) GetSubmissionByID(ctx context.Context, submissionID uuid.UUID) (domain.AssignmentSubmission, error) {
-	row, err := r.queries.GetSubmissionByID(ctx, pgUUID(submissionID))
+	row, err := r.queries.GetSubmissionByID(ctx, db.PgUUID(submissionID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.AssignmentSubmission{}, ErrSubmissionNotFound
@@ -255,7 +255,7 @@ func (r *assignmentRepository) GetSubmissionByID(ctx context.Context, submission
 
 func (r *assignmentRepository) GradeSubmission(ctx context.Context, submissionID uuid.UUID, grade int, feedback string) (domain.AssignmentSubmission, error) {
 	row, err := r.queries.GradeSubmission(ctx, db.GradeSubmissionParams{
-		ID:       pgUUID(submissionID),
+		ID:       db.PgUUID(submissionID),
 		Grade:    pgtype.Int4{Int32: int32(grade), Valid: true},
 		Feedback: pgtype.Text{String: feedback, Valid: feedback != ""},
 	})
@@ -265,7 +265,7 @@ func (r *assignmentRepository) GradeSubmission(ctx context.Context, submissionID
 		}
 		return domain.AssignmentSubmission{}, err
 	}
-	return toDomainSubmission(
+	submission, err := toDomainSubmission(
 		row.ID,
 		row.AssignmentID,
 		row.StudentID,
@@ -278,11 +278,17 @@ func (r *assignmentRepository) GradeSubmission(ctx context.Context, submissionID
 		row.CreatedAt,
 		row.UpdatedAt,
 	)
+	if err != nil {
+		return domain.AssignmentSubmission{}, err
+	}
+	submission.StudentName = row.StudentName
+	submission.StudentEmail = row.StudentEmail
+	return submission, nil
 }
 
 func (r *assignmentRepository) ListSubmissionsByAssignment(ctx context.Context, params ListSubmissionsByAssignmentParams) ([]domain.InstructorSubmission, error) {
 	rows, err := r.queries.ListSubmissionsByAssignment(ctx, db.ListSubmissionsByAssignmentParams{
-		AssignmentID: pgUUID(params.AssignmentID),
+		AssignmentID: db.PgUUID(params.AssignmentID),
 		Name:         params.Name,
 		LimitCount:   int32(params.Limit),
 		OffsetCount:  int32(params.Offset),
@@ -304,7 +310,7 @@ func (r *assignmentRepository) ListSubmissionsByAssignment(ctx context.Context, 
 
 func (r *assignmentRepository) CountSubmissionsByAssignment(ctx context.Context, assignmentID uuid.UUID, name string) (int, error) {
 	total, err := r.queries.CountSubmissionsByAssignment(ctx, db.CountSubmissionsByAssignmentParams{
-		AssignmentID: pgUUID(assignmentID),
+		AssignmentID: db.PgUUID(assignmentID),
 		Name:         name,
 	})
 	if err != nil {
@@ -315,8 +321,8 @@ func (r *assignmentRepository) CountSubmissionsByAssignment(ctx context.Context,
 
 func (r *assignmentRepository) IsEnrolled(ctx context.Context, studentID, courseID uuid.UUID) (bool, error) {
 	_, err := r.queries.GetEnrollment(ctx, db.GetEnrollmentParams{
-		UserID:   pgUUID(studentID),
-		CourseID: pgUUID(courseID),
+		UserID:   db.PgUUID(studentID),
+		CourseID: db.PgUUID(courseID),
 	})
 	if err == nil {
 		return true, nil
@@ -344,15 +350,15 @@ func (r *assignmentRepository) CloseOverdue(ctx context.Context) ([]domain.Assig
 }
 
 func toDomainAssignment(row db.Assignment) (domain.Assignment, error) {
-	id, err := fromPgUUID(row.ID)
+	id, err := db.FromPgUUID(row.ID)
 	if err != nil {
 		return domain.Assignment{}, fmt.Errorf("parse assignment id: %w", err)
 	}
-	courseID, err := fromPgUUID(row.CourseID)
+	courseID, err := db.FromPgUUID(row.CourseID)
 	if err != nil {
 		return domain.Assignment{}, fmt.Errorf("parse course id: %w", err)
 	}
-	createdBy, err := fromPgUUID(row.CreatedBy)
+	createdBy, err := db.FromPgUUID(row.CreatedBy)
 	if err != nil {
 		return domain.Assignment{}, fmt.Errorf("parse created_by: %w", err)
 	}
@@ -377,15 +383,15 @@ func toDomainSubmission(
 	feedback pgtype.Text,
 	createdAt, updatedAt pgtype.Timestamptz,
 ) (domain.AssignmentSubmission, error) {
-	id, err := fromPgUUID(idPg)
+	id, err := db.FromPgUUID(idPg)
 	if err != nil {
 		return domain.AssignmentSubmission{}, fmt.Errorf("parse submission id: %w", err)
 	}
-	assignmentID, err := fromPgUUID(assignmentIDPg)
+	assignmentID, err := db.FromPgUUID(assignmentIDPg)
 	if err != nil {
 		return domain.AssignmentSubmission{}, fmt.Errorf("parse assignment id: %w", err)
 	}
-	studentID, err := fromPgUUID(studentIDPg)
+	studentID, err := db.FromPgUUID(studentIDPg)
 	if err != nil {
 		return domain.AssignmentSubmission{}, fmt.Errorf("parse student id: %w", err)
 	}

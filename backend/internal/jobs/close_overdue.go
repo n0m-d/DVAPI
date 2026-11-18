@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
-	"github.com/n0m-d/DVAPI/internal/service"
 )
 
 func registerCloseOverdue(s gocron.Scheduler, deps Deps) error {
@@ -20,7 +19,7 @@ func registerCloseOverdue(s gocron.Scheduler, deps Deps) error {
 	return err
 }
 
-func closeOverdueAssignments(assignments service.AssignmentService, log *slog.Logger) {
+func closeOverdueAssignments(assignments OverdueCloser, log *slog.Logger) {
 	/*
 		Each cron tick is independent: uses a fresh Background context so a previous
 		tick's cancel/timeout cannot leak into the next minute's run.

@@ -44,29 +44,18 @@ func (m *mockUserService) AdminCreate(context.Context, domain.AdminCreateUserReq
 	return domain.User{}, nil
 }
 
-// AdminList is a stub implementation that satisfies the UserService interface.
-func (m *mockUserService) AdminList(context.Context, string, string, int, int) (domain.AdminUserListResponse, error) {
-	return domain.AdminUserListResponse{}, nil
-}
-
-// AdminUpdate is a stub implementation that satisfies the UserService interface.
 func (m *mockUserService) AdminUpdate(context.Context, uuid.UUID, uuid.UUID, domain.AdminUpdateUserRequest) (domain.User, error) {
 	return domain.User{}, nil
-}
-
-// AdminStats is a stub implementation that satisfies the UserService interface.
-func (m *mockUserService) AdminStats(context.Context) (domain.AdminStats, error) {
-	return domain.AdminStats{}, nil
 }
 
 // setupUserRouter creates a minimal Gin router configured for testing the UserHandler.
 // It injects the provided service (typically a mock) and sets up the GET /users/:id route.
 // This allows tests to send HTTP requests to the handler without starting a real server.
-func setupUserRouter(svc service.UserService) *gin.Engine {
-	gin.SetMode(gin.TestMode)        // Disables debug output during tests
-	r := gin.New()                   // Create a fresh router
-	h := handler.NewUserHandler(svc) // Inject the mock or real service
-	r.GET("/users/:id", h.GetByID)   // Register the route being tested
+func setupUserRouter(svc handler.UserService) *gin.Engine {
+	gin.SetMode(gin.TestMode)             // Disables debug output during tests
+	r := gin.New()                        // Create a fresh router
+	h := handler.NewUserHandler(svc, nil) // Inject the mock or real service
+	r.GET("/users/:id", h.GetByID)        // Register the route being tested
 	return r
 }
 
@@ -128,7 +117,7 @@ func TestGetByID_Returns400OnInvalidUUID(t *testing.T) {
 
 // TestGetByID_Returns500OnUnexpectedError verifies that when the service returns an unmapped error
 // (e.g., database connection failure), the handler returns HTTP 500 Internal Server Error.
-// This tests the catch-all error handling for errors not explicitly mapped in respondServiceError.
+// This tests the catch-all error handling for errors not explicitly mapped in respondError.
 func TestGetByID_Returns500OnUnexpectedError(t *testing.T) {
 	t.Parallel()
 

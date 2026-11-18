@@ -40,7 +40,7 @@ func NewNotificationRepository(queries *db.Queries) NotificationRepository {
 
 func (r *notificationRepository) Create(ctx context.Context, input domain.CreateNotificationInput) (domain.Notification, error) {
 	row, err := r.queries.CreateNotification(ctx, db.CreateNotificationParams{
-		UserID:   pgUUID(input.UserID),
+		UserID:   db.PgUUID(input.UserID),
 		Type:     input.Type,
 		Title:    input.Title,
 		Body:     input.Body,
@@ -65,7 +65,7 @@ func (r *notificationRepository) CreateMany(
 		if id == uuid.Nil {
 			continue
 		}
-		pgIDs = append(pgIDs, pgUUID(id))
+		pgIDs = append(pgIDs, db.PgUUID(id))
 	}
 	if len(pgIDs) == 0 {
 		return nil, nil, nil
@@ -87,7 +87,7 @@ func (r *notificationRepository) CreateMany(
 		if err != nil {
 			return nil, nil, err
 		}
-		userID, err := fromPgUUID(row.UserID)
+		userID, err := db.FromPgUUID(row.UserID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("notification user id: %w", err)
 		}
@@ -99,7 +99,7 @@ func (r *notificationRepository) CreateMany(
 
 func (r *notificationRepository) ListByUser(ctx context.Context, params NotificationListParams) ([]domain.Notification, error) {
 	rows, err := r.queries.ListNotificationsByUser(ctx, db.ListNotificationsByUserParams{
-		UserID:      pgUUID(params.UserID),
+		UserID:      db.PgUUID(params.UserID),
 		UnreadOnly:  params.UnreadOnly,
 		LimitCount:  int32(params.Limit),
 		OffsetCount: int32(params.Offset),
@@ -120,7 +120,7 @@ func (r *notificationRepository) ListByUser(ctx context.Context, params Notifica
 
 func (r *notificationRepository) CountByUser(ctx context.Context, userID uuid.UUID, unreadOnly bool) (int, error) {
 	total, err := r.queries.CountNotificationsByUser(ctx, db.CountNotificationsByUserParams{
-		UserID:     pgUUID(userID),
+		UserID:     db.PgUUID(userID),
 		UnreadOnly: unreadOnly,
 	})
 	if err != nil {
@@ -130,7 +130,7 @@ func (r *notificationRepository) CountByUser(ctx context.Context, userID uuid.UU
 }
 
 func (r *notificationRepository) CountUnread(ctx context.Context, userID uuid.UUID) (int, error) {
-	total, err := r.queries.CountUnreadNotificationsByUser(ctx, pgUUID(userID))
+	total, err := r.queries.CountUnreadNotificationsByUser(ctx, db.PgUUID(userID))
 	if err != nil {
 		return 0, err
 	}
@@ -139,8 +139,8 @@ func (r *notificationRepository) CountUnread(ctx context.Context, userID uuid.UU
 
 func (r *notificationRepository) MarkRead(ctx context.Context, id, userID uuid.UUID) (domain.Notification, error) {
 	row, err := r.queries.MarkNotificationRead(ctx, db.MarkNotificationReadParams{
-		ID:     pgUUID(id),
-		UserID: pgUUID(userID),
+		ID:     db.PgUUID(id),
+		UserID: db.PgUUID(userID),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -152,11 +152,11 @@ func (r *notificationRepository) MarkRead(ctx context.Context, id, userID uuid.U
 }
 
 func (r *notificationRepository) MarkAllRead(ctx context.Context, userID uuid.UUID) (int64, error) {
-	return r.queries.MarkAllNotificationsRead(ctx, pgUUID(userID))
+	return r.queries.MarkAllNotificationsRead(ctx, db.PgUUID(userID))
 }
 
 func (r *notificationRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	affected, err := r.queries.DeleteNotification(ctx, pgUUID(id))
+	affected, err := r.queries.DeleteNotification(ctx, db.PgUUID(id))
 	if err != nil {
 		return err
 	}
@@ -170,17 +170,17 @@ func optionalPgUUID(id *uuid.UUID) pgtype.UUID {
 	if id == nil || *id == uuid.Nil {
 		return pgtype.UUID{}
 	}
-	return pgUUID(*id)
+	return db.PgUUID(*id)
 }
 
 func toDomainNotification(row db.Notification) (domain.Notification, error) {
-	id, err := fromPgUUID(row.ID)
+	id, err := db.FromPgUUID(row.ID)
 	if err != nil {
 		return domain.Notification{}, fmt.Errorf("notification id: %w", err)
 	}
 	var courseID *uuid.UUID
 	if row.CourseID.Valid {
-		cid, err := fromPgUUID(row.CourseID)
+		cid, err := db.FromPgUUID(row.CourseID)
 		if err != nil {
 			return domain.Notification{}, fmt.Errorf("notification course id: %w", err)
 		}

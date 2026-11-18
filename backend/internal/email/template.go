@@ -14,37 +14,76 @@ var bodyTpl *template.Template
 
 func init() {
 	var err error
-	bodyTpl, err = template.ParseFS(templateFS, "templates/otp_reset.html")
+	bodyTpl, err = template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
-		panic("failed to parse otp email template: " + err.Error())
+		panic("failed to parse email templates: " + err.Error())
 	}
 }
 
-// OTPEmailData is the template data for password-reset OTP emails.
-type OTPEmailData struct {
+type otpEmailData struct {
 	Name      string
 	OTP       string
 	CustomMsg string
 }
 
-// RenderOTPEmail returns the subject and HTML body for a password-reset OTP.
-func RenderOTPEmail(data OTPEmailData) (subject string, htmlBody string, err error) {
-	var bodyBuf bytes.Buffer
-	if err = bodyTpl.Execute(&bodyBuf, data); err != nil {
-		return "", "", fmt.Errorf("render otp email body: %w", err)
-	}
-	return "Password Reset OTP", bodyBuf.String(), nil
+type enrollmentEmailData struct {
+	Name       string
+	CourseName string
 }
 
-// SendOTPEmail renders and sends a password-reset OTP email.
-func SendOTPEmail(sender Sender, to, name, otp, customMsg string) error {
-	subject, htmlBody, err := RenderOTPEmail(OTPEmailData{
+type welcomeEmailData struct {
+	Name string
+}
+
+type gradeEmailData struct {
+	Name            string
+	CourseName      string
+	AssignmentTitle string
+	Grade           int
+	Feedback        string
+}
+
+func sendOTPEmail(sender Sender, to, name, otp, customMsg string) error {
+	var body bytes.Buffer
+	if err := bodyTpl.ExecuteTemplate(&body, "otp_reset.html", otpEmailData{
 		Name:      name,
 		OTP:       otp,
 		CustomMsg: customMsg,
-	})
-	if err != nil {
-		return err
+	}); err != nil {
+		return fmt.Errorf("render otp email body: %w", err)
 	}
-	return sender.Send(to, subject, htmlBody)
+	return sender.Send(to, "Password Reset OTP", body.String())
+}
+
+func sendEnrollmentEmail(sender Sender, to, name, courseName string) error {
+	var body bytes.Buffer
+	if err := bodyTpl.ExecuteTemplate(&body, "enrollment.html", enrollmentEmailData{
+		Name:       name,
+		CourseName: courseName,
+	}); err != nil {
+		return fmt.Errorf("render enrollment email body: %w", err)
+	}
+	return sender.Send(to, "Course Enrollment", body.String())
+}
+
+func sendWelcomeEmail(sender Sender, to, name string) error {
+	var body bytes.Buffer
+	if err := bodyTpl.ExecuteTemplate(&body, "welcome.html", welcomeEmailData{Name: name}); err != nil {
+		return fmt.Errorf("render welcome email body: %w", err)
+	}
+	return sender.Send(to, "Welcome to Schole", body.String())
+}
+
+func sendGradeEmail(sender Sender, to, name, courseName, assignmentTitle string, grade int, feedback string) error {
+	var body bytes.Buffer
+	if err := bodyTpl.ExecuteTemplate(&body, "grade.html", gradeEmailData{
+		Name:            name,
+		CourseName:      courseName,
+		AssignmentTitle: assignmentTitle,
+		Grade:           grade,
+		Feedback:        feedback,
+	}); err != nil {
+		return fmt.Errorf("render grade email body: %w", err)
+	}
+	return sender.Send(to, "Grade Posted", body.String())
 }

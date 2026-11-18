@@ -1,22 +1,29 @@
 package handler
 
 import (
-	"errors"
+	"context"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/n0m-d/DVAPI/internal/domain"
-	"github.com/n0m-d/DVAPI/internal/middleware"
 	"github.com/n0m-d/DVAPI/internal/service"
 	"github.com/n0m-d/DVAPI/internal/utils"
 )
 
-type AuthHandler struct {
-	authService service.AuthService
+// AuthService is the subset of auth operations the auth endpoints use.
+type AuthService interface {
+	Register(ctx context.Context, input service.RegisterInput) (domain.User, error)
+	Login(ctx context.Context, email, password string) (*domain.LoginResponse, error)
+	Logout(ctx context.Context, token string) error
+	UpdatePassword(ctx context.Context, userId uuid.UUID, currentPassword, newPassword string) error
 }
 
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
+type AuthHandler struct {
+	authService AuthService
+}
+
+func NewAuthHandler(authService AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
@@ -59,11 +66,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	resp, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password", "status": "error"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
+		respondError(c, err)
 		return
 	}
 
@@ -95,20 +98,13 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	raw, ok := c.Get(middleware.ClaimsKey)
+	claims, ok := currentClaims(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
-		return
-	}
-
-	claims, ok := raw.(*domain.Claims)
-	if !ok || claims == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "status": "error"})
 		return
 	}
 
 	if err := h.authService.UpdatePassword(c.Request.Context(), claims.UserID, req.CurrentPassword, req.Password); err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -140,7 +136,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		FullName: req.FullName,
 	})
 	if err != nil {
-		respondServiceError(c, err)
+		respondError(c, err)
 		return
 	}
 
@@ -158,28 +154,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Failure      500   "Internal server error"
 // @Router       /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
-	token := bearerToken(c.GetHeader("Authorization"))
+	token := utils.BearerToken(c.GetHeader("Authorization"))
 	if token == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token", "status": "error"})
 		return
 	}
 
 	if err := h.authService.Logout(c.Request.Context(), token); err != nil {
-		if errors.Is(err, service.ErrUnauthorized) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token", "status": "error"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "status": "error"})
+		respondError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully", "status": "success"})
-}
-
-func bearerToken(header string) string {
-	const prefix = "Bearer "
-	if !strings.HasPrefix(header, prefix) {
-		return ""
-	}
-	return strings.TrimSpace(strings.TrimPrefix(header, prefix))
 }

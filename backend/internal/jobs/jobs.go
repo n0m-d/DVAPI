@@ -1,16 +1,27 @@
 package jobs
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/go-co-op/gocron/v2"
-	"github.com/n0m-d/DVAPI/internal/service"
+	"github.com/n0m-d/DVAPI/internal/domain"
 )
+
+// OverdueCloser closes assignments whose due date has passed.
+type OverdueCloser interface {
+	CloseOverdue(ctx context.Context) ([]domain.Assignment, error)
+}
+
+// OTPPurger deletes expired password-reset OTPs.
+type OTPPurger interface {
+	PurgeOTP(ctx context.Context) (int64, error)
+}
 
 // Deps holds dependencies shared by scheduled jobs.
 type Deps struct {
-	Assignments service.AssignmentService
-	Reset       service.PasswordResetService
+	Assignments OverdueCloser
+	Reset       OTPPurger
 	Log         *slog.Logger
 }
 
